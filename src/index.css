@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Tajawal", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-50: #fdf8f4;
+  --color-brand-100: #fbeee0;
+  --color-brand-200: #f6dcc1;
+  --color-brand-300: #efa15c;
+  --color-brand-400: #ea8a3a;
+  --color-brand-500: #e2721d;
+  --color-brand-600: #cc5c11;
+  --color-brand-700: #a9440c;
+  --color-brand-800: #86320b;
+  --color-brand-900: #6a240a;
+}
+
+body {
+  font-family: var(--font-sans);
+  direction: rtl;
+  background-color: #faf8f5;
+  color: #2d2924;
+}
+
+/* Beautiful custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #faf6f0;
+  border-left: 1px solid #f1e6da;
+}
+::-webkit-scrollbar-thumb {
+  background: #efa15c;
+  border: 2px solid #faf6f0;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e2721d;
+}

@@ -1,0 +1,6 @@
+{
+  "name": "أليف - منصة الحيوانات الأليفة",
+  "description": "منصة أليف لتسهيل تبني الحيوانات الأليفة، التزاوج، والإبلاغ عن الحيوانات المفقودة في اليمن.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
