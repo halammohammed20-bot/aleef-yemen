@@ -58,7 +58,7 @@ export default function AddPetModal({
   const [city, setCity] = useState(initialLoc.city);
 
   const [imageUrls, setImageUrls] = useState<string[]>(
-    editingPet?.imageUrls || (editingPet?.imageUrl ? [editingPet.imageUrl] : [PRESET_IMAGES[0].url])
+    editingPet?.imageUrls || (editingPet?.imageUrl ? [editingPet.imageUrl] : [])
   );
   const [activePreviewIndex, setActivePreviewIndex] = useState(0);
   const [description, setDescription] = useState(editingPet ? editingPet.description : "");
@@ -82,17 +82,6 @@ export default function AddPetModal({
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoUploadProgress, setVideoUploadProgress] = useState(false);
   const [imageUploadProgress, setImageUploadProgress] = useState(false);
-
-  // Set default preset image if user changes category
-  useEffect(() => {
-    if (!editingPet) {
-      const matchedPreset = PRESET_IMAGES.find((p) => p.type === category);
-      if (matchedPreset) {
-        setImageUrls([matchedPreset.url]);
-        setActivePreviewIndex(0);
-      }
-    }
-  }, [category, editingPet]);
 
   // Handle local device file upload: يرفع الصور مباشرة إلى Supabase Storage
   // ويحفظ روابطها العامة (public URLs) بدل تخزينها كـ base64 ضخم داخل قاعدة البيانات.
@@ -212,6 +201,11 @@ export default function AddPetModal({
       return;
     }
 
+    if (imageUrls.length === 0) {
+      setFormError("الرجاء رفع صورة واحدة على الأقل من جهازك قبل نشر الإعلان 📷");
+      return;
+    }
+
     if (purpose === "lost" && (!lostDate || !lostTime)) {
       setFormError("الرجاء تحديد تاريخ ووقت فقدان الأليف لتفعيل عداد الوقت بدقة ⏰");
       return;
@@ -236,7 +230,7 @@ export default function AddPetModal({
       age,
       location: combinedLocation,
       purpose,
-      imageUrl: imageUrls[0] || PRESET_IMAGES[0].url,
+      imageUrl: imageUrls[0],
       imageUrls,
       description: finalDescription,
       healthStatus,
@@ -611,33 +605,6 @@ export default function AddPetModal({
                       </button>
                     </div>
                   </div>
-
-                  {/* Preset alternatives to add */}
-                  <div className="space-y-2 pt-2 border-t border-gray-100">
-                    <span className="text-[11px] font-black text-gray-400 block">اضغط على أي صورة رمزية مسبقة لإضافتها لمعرض الصور:</span>
-                    <div className="grid grid-cols-3 gap-2">
-                      {PRESET_IMAGES.filter(p => p.type === category).map((preset) => (
-                        <button
-                          key={preset.label}
-                          type="button"
-                          onClick={() => {
-                            if (!imageUrls.includes(preset.url)) {
-                              setImageUrls(prev => {
-                                const updated = [...prev, preset.url].slice(0, 8);
-                                setActivePreviewIndex(updated.length - 1);
-                                return updated;
-                              });
-                            }
-                          }}
-                          className="relative aspect-video rounded-xl overflow-hidden border border-gray-200 opacity-80 hover:opacity-100 transition-all cursor-pointer hover:scale-95"
-                        >
-                          <img src={preset.url} alt={preset.label} className="w-full h-full object-cover" />
-                          <span className="absolute inset-0 bg-black/30 hover:bg-transparent flex items-center justify-center text-[10px] text-white font-extrabold transition-all">+{preset.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
               </div>
 
 
@@ -669,7 +636,8 @@ export default function AddPetModal({
                 />
               </div>
 
-              {/* Device Native Video File */}
+              {/* Device Native Video File — متاح فقط لحالات الإنقاذ والمفقود */}
+              {(purpose === "rescue" || purpose === "lost") && (
               <div className="space-y-2.5 p-4 bg-slate-50/70 rounded-2xl border border-slate-200">
                 <label className="block text-xs font-black text-gray-800">مقطع فيديو للأليف 🎥 (اختياري، يرجى رفعه من جهازك مباشرة):</label>
                 
@@ -728,12 +696,10 @@ export default function AddPetModal({
                   </div>
                 )}
               </div>
-
-              {/* Success Story when resolved as rescued */}
+              )}
               {(purpose === "rescue" || status === "rescued") && (
                 <div className="p-4 bg-emerald-50/60 rounded-2xl border border-emerald-100 space-y-2">
-                  <label className="block text-xs font-black text-emerald-900 mb-1">قصة وتفاصيل الإنقاذ الناجح 💚🏆 (اختياري لكن ملهم جداً!)</label>
-                  <p className="text-[10px] text-emerald-800 font-bold">إذا تم إنقاذ الحيوان بالفعل، يرجى كتابة قصته القصيرة الملهمة هنا ليراها الجميع في صفحة حكايات النجاح!</p>
+                  <label className="block text-xs font-black text-emerald-900 mb-1">قصة وتفاصيل الإنقاذ الناجح 💚🏆</label>
                   <textarea
                     rows={3}
                     placeholder="اكتب كيف تم إنقاذ الأليف، من ساعده، وأين يعيش الآن بأمان..."

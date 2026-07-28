@@ -78,15 +78,6 @@ export default function Sidebar({
       category: "browse"
     },
     {
-      id: "success-stories",
-      label: "قصص وحكايات الإنقاذ الناجحة 🏆",
-      description: "تصفح قصص ملهمة لحيوانات أليفة تم تبنيها أو إنقاذها بنجاح في اليمن",
-      icon: BookOpen,
-      color: "text-emerald-600 bg-emerald-50",
-      activeBg: "bg-emerald-600 text-white shadow-md shadow-emerald-600/10",
-      category: "browse"
-    },
-    {
       id: "clinics",
       label: "دليل العيادات والأطباء 🏥",
       description: "ابحث عن أقرب عيادة بيطرية مرخصة لعلاج أليفك",

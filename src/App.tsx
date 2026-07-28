@@ -292,11 +292,6 @@ export default function App() {
     // Category match
     const matchesCategory = selectedCategory === "all" || pet.category === selectedCategory;
 
-    if (activeTab === "success-stories") {
-      const isResolved = pet.status === "rescued";
-      return isResolved && matchesSearch && matchesGovernorate && matchesCity && matchesCategory;
-    }
-
     // Determine target purpose based on active tab
     let targetPurpose = "adoption";
     if (activeTab === "lost-pets") {
@@ -324,7 +319,7 @@ export default function App() {
     return matchesPurpose && isAvailable && matchesSearch && matchesGovernorate && matchesCity && matchesCategory && matchesRescueStatus;
   });
 
-  const isListingTab = ["pets", "lost-pets", "mating", "rescue-cases", "success-stories"].includes(activeTab);
+  const isListingTab = ["pets", "lost-pets", "mating", "rescue-cases"].includes(activeTab);
 
   return (
     <div className="min-h-screen bg-[#faf8f5] flex flex-col font-sans selection:bg-brand-100 selection:text-brand-900">
@@ -413,21 +408,6 @@ export default function App() {
               >
                 <ShieldAlert className="w-4 h-4 text-red-500" />
                 <span>حالات الإنقاذ العاجلة 🚨</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setActiveTab("success-stories");
-                  setSelectedCategory("all");
-                }}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-black transition-all border shrink-0 cursor-pointer ${
-                  activeTab === "success-stories"
-                    ? "bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/10"
-                    : "bg-white text-gray-600 border-gray-200/80 hover:bg-gray-50 hover:text-gray-900"
-                }`}
-              >
-                <BookOpen className="w-4 h-4 text-emerald-500" />
-                <span>أجمل حكايات الإنقاذ الناجحة 🏆</span>
               </button>
             </div>
           </div>
@@ -1233,375 +1213,6 @@ export default function App() {
           </div>
         )}
 
-        {activeTab === "success-stories" && (() => {
-          const filteredStories = pets.filter(pet => {
-            const isResolved = pet.status === "rescued";
-            if (!isResolved) return false;
-
-            // search query match
-            const query = successStoriesQuery.toLowerCase();
-            const matchesSearch = query === "" ||
-              pet.name.toLowerCase().includes(query) ||
-              pet.breed.toLowerCase().includes(query) ||
-              pet.location.toLowerCase().includes(query) ||
-              (pet.rescueStory && pet.rescueStory.toLowerCase().includes(query)) ||
-              pet.description.toLowerCase().includes(query);
-
-            if (!matchesSearch) return false;
-
-            // governorate match
-            const matchesGovernorate = successStoryGov === "" || pet.location.includes(successStoryGov);
-            if (!matchesGovernorate) return false;
-
-            // city match
-            const matchesCity = successStoryCity === "" || pet.location.includes(successStoryCity);
-            if (!matchesCity) return false;
-
-            return true;
-          });
-
-          return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12" dir="rtl">
-              {/* Header */}
-              <div className="text-center max-w-3xl mx-auto mb-12">
-                <span className="inline-block px-4 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-black rounded-full mb-3 border border-emerald-100">
-                  🏆 لوحة الشرف وحكايات الأمل والإنقاذ في اليمن
-                </span>
-                <h2 className="text-3xl sm:text-4xl font-black text-brand-900 leading-tight">
-                  أجمل حكايات الإنقاذ الناجحة
-                </h2>
-                <p className="text-base text-gray-500 font-bold mt-3 leading-relaxed">
-                  هنا نروي حكايات ملهمة لحيوانات أليفة حظيت بفرصة ثانية للحياة وتم إنقاذها بنجاح بفضل أبطال ورعاة رائعين في اليمن.
-                </p>
-              </div>
-
-              {/* Real-time Filters Bar for Success Stories */}
-              <div className="bg-white p-5 rounded-3xl border border-[#ede5d8] shadow-xs max-w-4xl mx-auto mb-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Search input */}
-                  <div className="relative">
-                    <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-gray-400">
-                      <Search className="w-4.5 h-4.5" />
-                    </span>
-                    <input
-                      type="text"
-                      placeholder="البحث بالاسم، السلالة، تفاصيل القصة..."
-                      value={successStoriesQuery}
-                      onChange={(e) => setSuccessStoriesQuery(e.target.value)}
-                      className="w-full pl-4 pr-11 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xs sm:text-sm font-semibold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white text-right"
-                    />
-                  </div>
-
-                  {/* Governorate selection */}
-                  <div>
-                    <select
-                      value={successStoryGov}
-                      onChange={(e) => {
-                        setSuccessStoryGov(e.target.value);
-                        setSuccessStoryCity(""); // reset city
-                      }}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xs sm:text-sm font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white text-right cursor-pointer"
-                    >
-                      <option value="">كل المحافظات 🇾🇪</option>
-                      {GOVERNORATES_YEMEN.map((gov) => (
-                        <option key={gov} value={gov}>
-                          {gov}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* City selection */}
-                  <div>
-                    <select
-                      value={successStoryCity}
-                      onChange={(e) => setSuccessStoryCity(e.target.value)}
-                      disabled={!successStoryGov}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-xs sm:text-sm font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white text-right disabled:opacity-50 cursor-pointer"
-                    >
-                      <option value="">كل المديريات / المناطق</option>
-                      {successStoryGov &&
-                        CITIES_BY_GOVERNORATE[successStoryGov]?.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* List of Success stories */}
-              {filteredStories.length === 0 ? (
-                <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-[#e6decf] max-w-lg mx-auto">
-                  <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-3xl">🏆</span>
-                  </div>
-                  <h4 className="text-xl font-black text-gray-700">لا توجد حكايات نجاح مطابقة لبحثك!</h4>
-                  <p className="text-sm text-gray-400 font-bold mt-1 max-w-xs mx-auto leading-relaxed">
-                    تأكد من كتابة الكلمات بشكل صحيح أو تصفح باقي التصنيفات.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-8">
-                  {filteredStories.map((pet) => {
-                    const isExpanded = expandedPetId === pet.id;
-                    const images = pet.imageUrls && pet.imageUrls.length > 0 ? pet.imageUrls : [pet.imageUrl];
-                    const mainImage = images[0];
-
-                    const mediaItems = [
-                      ...images.map(url => ({ type: "image", url })),
-                      ...(pet.videoUrl ? [{ type: "video", url: pet.videoUrl }] : [])
-                    ];
-                    const currentMediaIndex = successStoryMediaIndex[pet.id] || 0;
-                    const activeIndex = currentMediaIndex >= mediaItems.length ? 0 : currentMediaIndex;
-                    const activeMedia = mediaItems[activeIndex] || { type: "image", url: mainImage };
-
-                    return (
-                      <div
-                        key={pet.id}
-                        onClick={() => setExpandedPetId(isExpanded ? null : pet.id)}
-                        className={`bg-white rounded-3xl border ${
-                          isExpanded ? "border-emerald-400 ring-4 ring-emerald-50" : "border-[#f3ede4]"
-                        } p-6 shadow-xs hover:shadow-lg transition-all duration-300 flex flex-col justify-between cursor-pointer w-full group text-right`}
-                      >
-                        {/* Horizontal layout: Image on one side, Info on the other */}
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-                          {/* Image Column (4 cols) */}
-                          <div className="md:col-span-4 w-full">
-                            <div className="relative aspect-16/10 md:aspect-4/3 w-full bg-black rounded-2xl overflow-hidden border border-[#f3ede4]">
-                              {activeMedia.type === "image" ? (
-                                <img
-                                  src={activeMedia.url}
-                                  alt={pet.name}
-                                  referrerPolicy="no-referrer"
-                                  className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-500"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-black flex items-center justify-center">
-                                  {activeMedia.url.includes("youtube.com") || activeMedia.url.includes("youtu.be") ? (
-                                    <iframe
-                                      src={
-                                        activeMedia.url.includes("embed")
-                                          ? activeMedia.url
-                                          : `https://www.youtube.com/embed/${activeMedia.url.split("v=")[1]?.split("&")[0] || activeMedia.url.split("/").pop()}`
-                                      }
-                                      title="Pet Video"
-                                      frameBorder="0"
-                                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                      allowFullScreen
-                                      className="w-full h-full"
-                                    ></iframe>
-                                  ) : (
-                                    <video
-                                      src={activeMedia.url}
-                                      controls
-                                      playsInline
-                                      className="w-full h-full object-contain"
-                                    />
-                                  )}
-                                </div>
-                              )}
-                              
-                              <div className="absolute top-3 right-3 z-10">
-                                <span className="px-3 py-1 bg-emerald-600 text-white text-[10px] font-black rounded-lg shadow-sm">
-                                  {pet.status === "adopted" && "🎉 تم التبني"}
-                                  {pet.status === "rescued" && "✅ تم الإنقاذ"}
-                                  {pet.status === "found" && "🏠 عاد لبيته"}
-                                  {pet.status === "completed" && "💖 تم التزاوج"}
-                                  {(!pet.status || pet.status === "available") && "🏆 قصة نجاح"}
-                                </span>
-                              </div>
-
-                              {/* Navigation Arrows */}
-                              {mediaItems.length > 1 && (
-                                <>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const prevIndex = (activeIndex - 1 + mediaItems.length) % mediaItems.length;
-                                      setSuccessStoryMediaIndex(prev => ({ ...prev, [pet.id]: prevIndex }));
-                                    }}
-                                    className="absolute top-1/2 -translate-y-1/2 left-3 z-20 w-8 h-8 rounded-full bg-white/85 hover:bg-white text-gray-800 flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer border border-gray-100"
-                                    title="السابق"
-                                  >
-                                    <ChevronLeft className="w-5 h-5" />
-                                  </button>
-
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const nextIndex = (activeIndex + 1) % mediaItems.length;
-                                      setSuccessStoryMediaIndex(prev => ({ ...prev, [pet.id]: nextIndex }));
-                                    }}
-                                    className="absolute top-1/2 -translate-y-1/2 right-3 z-20 w-8 h-8 rounded-full bg-white/85 hover:bg-white text-gray-800 flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer border border-gray-100"
-                                    title="التالي"
-                                  >
-                                    <ChevronRight className="w-5 h-5" />
-                                  </button>
-
-                                  {/* Dot Indicators */}
-                                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex gap-1 bg-black/40 px-2 py-1 rounded-full">
-                                    {mediaItems.map((_, idx) => (
-                                      <span
-                                        key={idx}
-                                        className={`w-1.5 h-1.5 rounded-full transition-all ${
-                                          idx === activeIndex ? "bg-white w-3" : "bg-white/50"
-                                        }`}
-                                      />
-                                    ))}
-                                  </div>
-                                </>
-                              )}
-                            </div>
-
-                            {/* Additional previews in expanded view */}
-                            {isExpanded && mediaItems.length > 1 && (
-                              <div className="flex gap-2 mt-3 overflow-x-auto pb-1" onClick={(e) => e.stopPropagation()}>
-                                {mediaItems.map((item, idx) => (
-                                  <div
-                                    key={idx}
-                                    onClick={() => setSuccessStoryMediaIndex(prev => ({ ...prev, [pet.id]: idx }))}
-                                    className={`w-16 h-12 shrink-0 rounded-lg overflow-hidden border cursor-pointer transition-all ${
-                                      idx === activeIndex ? "border-emerald-500 ring-2 ring-emerald-100" : "border-gray-200 hover:border-gray-400"
-                                    }`}
-                                  >
-                                    {item.type === "image" ? (
-                                      <img src={item.url} alt="thumb" className="w-full h-full object-cover" />
-                                    ) : (
-                                      <div className="w-full h-full bg-black flex items-center justify-center text-white text-[10px] font-black">
-                                        🎥 مقطع
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Info Column (8 cols) */}
-                          <div className="md:col-span-8 space-y-4">
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <h3 className="text-2xl font-black text-gray-900 group-hover:text-emerald-700 transition-colors">
-                                  {pet.name}
-                                </h3>
-                                <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-500 font-bold">
-                                  <span>السلالة: {pet.breed}</span>
-                                  <span>•</span>
-                                  <span>العمر: {pet.age}</span>
-                                  <span>•</span>
-                                  <span className="flex items-center gap-1 text-emerald-700">
-                                    <MapPin className="w-3.5 h-3.5" />
-                                    {pet.location}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <span className="p-1.5 bg-gray-50 text-gray-400 rounded-xl group-hover:text-emerald-700 group-hover:bg-emerald-50 transition-all shrink-0">
-                                {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                              </span>
-                            </div>
-
-                            {/* Brief layout or Full expanded story layout */}
-                            <div className="p-4 bg-emerald-50/40 rounded-2xl border border-emerald-100/30 relative">
-                              <span className="absolute left-3 top-1 text-3xl text-emerald-200/60 font-serif leading-none">”</span>
-                              <p className={`text-xs sm:text-sm text-emerald-950 font-bold leading-relaxed whitespace-pre-line text-right ${
-                                isExpanded ? "" : "line-clamp-2"
-                              }`}>
-                                {pet.rescueStory || pet.description}
-                              </p>
-                            </div>
-
-                            {/* Collapsed view CTA */}
-                            {!isExpanded && (
-                              <div className="flex justify-between items-center text-xs font-black text-gray-400 pt-2">
-                                <span>البطل: {pet.ownerName}</span>
-                                <span className="text-emerald-600 hover:underline">اضغط لقراءة القصة كاملة ورؤية الفيديو 📖</span>
-                              </div>
-                            )}
-
-                            {/* Expanded Details section */}
-                            {isExpanded && (
-                              <div className="space-y-4 pt-4 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
-                                {/* Video Section if videoUrl is present */}
-                                {pet.videoUrl && (
-                                  <div className="space-y-2 text-right">
-                                    <h4 className="text-xs font-black text-gray-800 flex items-center gap-1.5">
-                                      <span>🎥 فيديو وثائقي ومقطع الحالة:</span>
-                                    </h4>
-                                    <div className="relative aspect-video w-full max-w-xl bg-black rounded-2xl overflow-hidden border border-gray-100 shadow-sm">
-                                      {pet.videoUrl.includes("youtube.com") || pet.videoUrl.includes("youtu.be") ? (
-                                        <iframe
-                                          src={
-                                            pet.videoUrl.includes("embed")
-                                              ? pet.videoUrl
-                                              : `https://www.youtube.com/embed/${pet.videoUrl.split("v=")[1]?.split("&")[0] || pet.videoUrl.split("/").pop()}`
-                                          }
-                                          title="Pet Video"
-                                          frameBorder="0"
-                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                          allowFullScreen
-                                          className="w-full h-full"
-                                        ></iframe>
-                                      ) : (
-                                        <video
-                                          src={pet.videoUrl}
-                                          controls
-                                          playsInline
-                                          className="w-full h-full object-contain"
-                                        />
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Specific Pet Stats */}
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                  <div className="p-3 bg-gray-50 rounded-xl">
-                                    <span className="block text-[10px] text-gray-400 font-black">الحالة الطبية:</span>
-                                    <span className="text-xs font-bold text-gray-700">{pet.healthStatus || "ممتازة"}</span>
-                                  </div>
-                                  <div className="p-3 bg-gray-50 rounded-xl">
-                                    <span className="block text-[10px] text-gray-400 font-black">التلقيحات / التطعيم:</span>
-                                    <span className="text-xs font-bold text-gray-700">{pet.vaccinated ? "✅ ملقح بالكامل" : "❌ غير ملقح"}</span>
-                                  </div>
-                                  <div className="p-3 bg-gray-50 rounded-xl col-span-2 sm:col-span-1">
-                                    <span className="block text-[10px] text-gray-400 font-black">تاريخ الإضافة:</span>
-                                    <span className="text-xs font-bold text-gray-700">
-                                      {new Date(pet.createdAt).toLocaleDateString('ar-YE', { year: 'numeric', month: 'long', day: 'numeric' })}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Savior & Platform communication details */}
-                                <div className="p-4 bg-[#fbfaf7] border border-[#f5efe4] rounded-2xl flex items-center justify-between">
-                                  <div>
-                                    <span className="block text-[10px] text-gray-400 font-black text-right">صاحب القصة والبطل الراعي:</span>
-                                    <span className="text-sm font-black text-gray-800">{pet.ownerName}</span>
-                                  </div>
-                                  {pet.ownerPhone && (
-                                    <a
-                                      href={`tel:${pet.ownerPhone}`}
-                                      className="px-4 py-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white rounded-xl text-xs font-black transition-all duration-300"
-                                    >
-                                      اتصل بالراعي 📞
-                                    </a>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
         {activeTab === "clinics" && (() => {
           const filteredClinics = clinics.filter(c => {
             const query = clinicSearchQuery.toLowerCase();
@@ -1771,18 +1382,12 @@ export default function App() {
               <div className="md:col-span-5 space-y-4">
                 <div className="bg-white rounded-3xl p-6 border border-[#f3ede4] shadow-xs hover:shadow-md transition-all">
                   <span className="text-2xl">📱</span>
-                  <h4 className="text-base font-black text-gray-900 mt-2">رقم الهاتف المباشر</h4>
-                  <p className="text-xs text-gray-400 font-bold mt-1">اتصال أو واتساب على مدار الساعة:</p>
+                  <h4 className="text-base font-black text-gray-900 mt-2">رقم الهاتف</h4>
+                  <p className="text-xs text-gray-400 font-bold mt-1">تواصل معنا عبر واتساب على مدار الساعة:</p>
                   <p className="text-lg font-black text-brand-700 mt-2 tracking-wide" style={{ direction: "ltr" }}>
                     00976781003988
                   </p>
                   <div className="mt-4 flex gap-2">
-                    <a
-                      href="tel:00976781003988"
-                      className="flex-1 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black text-center transition-all"
-                    >
-                      اتصال مباشر
-                    </a>
                     <a
                       href="https://wa.me/00976781003988"
                       target="_blank"
@@ -1800,7 +1405,6 @@ export default function App() {
                   </h4>
                   <ul className="text-xs text-amber-800 space-y-1.5 font-bold leading-relaxed list-disc pr-4">
                     <li>طلب إضافة عيادة بيطرية جديدة في محافظتك.</li>
-                    <li>الإبلاغ عن إساءة معاملة لحيوان أليف.</li>
                     <li>المساعدة في استعادة كلمة مرور حسابك.</li>
                     <li>المقترحات والأفكار التطويرية للمنصة.</li>
                   </ul>
@@ -2023,7 +1627,6 @@ export default function App() {
       <footer className="bg-white border-t border-[#f3ede4] py-8 text-center text-xs font-bold text-gray-400">
         <div className="max-w-7xl mx-auto px-4 space-y-2">
           <p>© 2026 منصة أليف اليمن للحيوانات الأليفة. جميع الحقوق محفوظة لإنقاذ ورعاية الحيوان.</p>
-          <p className="text-[10px] text-gray-400">صنع بحب لمساعدة الأليفين وأصدقائهم في اليمن العظيم.</p>
         </div>
       </footer>
 
