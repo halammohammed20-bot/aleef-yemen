@@ -609,6 +609,7 @@ export default function AddPetModal({
 
 
             </div>
+            </div>
 
             {/* Description & Health Details */}
             <div className="space-y-4">
