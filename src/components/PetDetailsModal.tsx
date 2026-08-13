@@ -302,7 +302,14 @@ export default function PetDetailsModal({ pet, onClose }: PetDetailsModalProps) 
 
                 {/* Owner Info Section */}
                 <div className="pt-4 border-t border-gray-100">
-                  <h4 className="text-base font-black text-gray-900 mb-3">معلومات صاحب الإعلان:</h4>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-base font-black text-gray-900">معلومات صاحب الإعلان:</h4>
+                    {pet.createdAt && (
+                      <span className="text-[11px] text-gray-400 font-bold">
+                        نُشر بتاريخ {new Date(pet.createdAt).toLocaleDateString("ar-EG", { day: "numeric", month: "long", year: "numeric" })}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-brand-50/30 rounded-2xl border border-brand-100">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-brand-600 flex items-center justify-center text-white text-sm font-black">

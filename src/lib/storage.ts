@@ -11,9 +11,14 @@ export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 // الحد الأقصى لحجم الفيديو الواحد (25 ميجابايت)
 export const MAX_VIDEO_SIZE = 25 * 1024 * 1024;
 
-// إعدادات ضغط الصور التلقائي (يقلل استهلاك مساحة التخزين وحد النقل الشهري في Supabase)
-const IMAGE_MAX_DIMENSION = 1600; // أقصى عرض/ارتفاع بالبكسل بعد الضغط
-const IMAGE_QUALITY = 0.78; // جودة الضغط (0 إلى 1)
+// إعدادات ضغط الصور — 3 مستويات يختار المستخدم بينها عند الرفع
+export type ImageQualityLevel = "small" | "medium" | "high";
+
+const QUALITY_PRESETS: Record<ImageQualityLevel, { maxDimension: number; quality: number }> = {
+  small: { maxDimension: 900, quality: 0.6 }, // توفير أقصى للمساحة
+  medium: { maxDimension: 1600, quality: 0.78 }, // متوازن (موصى به)
+  high: { maxDimension: 2200, quality: 0.9 }, // أعلى جودة ممكنة
+};
 
 function randomFileName(originalName: string, forcedExt?: string): string {
   const ext = forcedExt || (originalName.includes(".") ? originalName.split(".").pop() : "bin");
@@ -22,20 +27,22 @@ function randomFileName(originalName: string, forcedExt?: string): string {
 }
 
 /**
- * يضغط الصورة تلقائياً قبل الرفع: يصغّر أبعادها إن كانت كبيرة، ويحوّلها لصيغة JPEG
- * مضغوطة، مما يقلل حجم الملف الحقيقي بشكل كبير (غالباً 60-90%) دون فرق واضح
- * في الجودة المرئية. هذا يحافظ على مساحة التخزين وحد النقل الشهري المجاني في Supabase.
+ * يضغط الصورة تلقائياً قبل الرفع حسب المستوى الذي يختاره المستخدم (صغير/متوسط/جودة عالية):
+ * يصغّر أبعادها ويحوّلها لصيغة JPEG مضغوطة، مما يقلل حجم الملف الحقيقي بشكل كبير
+ * (غالباً 60-90%) دون فرق واضح في الجودة المرئية عند المستوى المتوسط أو الأعلى.
  */
-export async function compressImage(file: File): Promise<File> {
+export async function compressImage(file: File, level: ImageQualityLevel = "medium"): Promise<File> {
   // نتجاهل GIF (قد تكون متحركة) ونرفعها كما هي
   if (file.type === "image/gif") return file;
+
+  const { maxDimension, quality } = QUALITY_PRESETS[level];
 
   try {
     const bitmap = await createImageBitmap(file);
     let { width, height } = bitmap;
 
-    if (width > IMAGE_MAX_DIMENSION || height > IMAGE_MAX_DIMENSION) {
-      const scale = IMAGE_MAX_DIMENSION / Math.max(width, height);
+    if (width > maxDimension || height > maxDimension) {
+      const scale = maxDimension / Math.max(width, height);
       width = Math.round(width * scale);
       height = Math.round(height * scale);
     }
@@ -49,7 +56,7 @@ export async function compressImage(file: File): Promise<File> {
     ctx.drawImage(bitmap, 0, 0, width, height);
 
     const blob: Blob | null = await new Promise((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", IMAGE_QUALITY)
+      canvas.toBlob(resolve, "image/jpeg", quality)
     );
 
     if (!blob || blob.size >= file.size) return file; // لا تستبدل الملف لو الضغط ما فادنا
@@ -65,14 +72,19 @@ export async function compressImage(file: File): Promise<File> {
 /**
  * يرفع ملف (صورة أو فيديو) إلى Supabase Storage ويعيد الرابط العام (public URL)
  * الذي يمكن حفظه مباشرة في عمود image_url / image_urls / video_url داخل قاعدة البيانات.
- * الصور تُضغط تلقائياً قبل الرفع لتقليل استهلاك المساحة.
+ * الصور تُضغط تلقائياً قبل الرفع حسب المستوى المختار لتقليل استهلاك المساحة.
  *
  * @param file الملف المطلوب رفعه
  * @param folder المجلد داخل الـ bucket، مثال: "pets", "clinics", "videos"
+ * @param qualityLevel مستوى جودة الصورة بعد الضغط (يتجاهله الفيديو)
  */
-export async function uploadMedia(file: File, folder: string): Promise<string> {
+export async function uploadMedia(
+  file: File,
+  folder: string,
+  qualityLevel: ImageQualityLevel = "medium"
+): Promise<string> {
   const isImage = file.type.startsWith("image/");
-  const fileToUpload = isImage ? await compressImage(file) : file;
+  const fileToUpload = isImage ? await compressImage(file, qualityLevel) : file;
 
   const path = `${folder}/${randomFileName(fileToUpload.name)}`;
 
@@ -95,8 +107,8 @@ export async function uploadMedia(file: File, folder: string): Promise<string> {
 }
 
 /** يرفع عدة صور بالتوازي ويعيد مصفوفة بالروابط العامة بنفس الترتيب. */
-export async function uploadImages(files: File[], folder: string): Promise<string[]> {
-  return Promise.all(files.map((file) => uploadMedia(file, folder)));
+export async function uploadImages(files: File[], folder: string, qualityLevel: ImageQualityLevel = "medium"): Promise<string[]> {
+  return Promise.all(files.map((file) => uploadMedia(file, folder, qualityLevel)));
 }
 
 /** يتأكد أن الملف صورة صحيحة الحجم قبل رفعها. */

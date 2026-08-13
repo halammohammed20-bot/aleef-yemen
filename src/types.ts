@@ -70,6 +70,14 @@ export interface CommunityPost {
   createdAt: string;
 }
 
+export interface PostComment {
+  id: string;
+  postId: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "model";

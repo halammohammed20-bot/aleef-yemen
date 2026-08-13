@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseClient";
-import { PetListing, Clinic, ClinicComment, CommunityPost, UserAccount } from "../types";
+import { PetListing, Clinic, ClinicComment, CommunityPost, UserAccount, PostComment } from "../types";
 
 /* ---------------------------------------------------------------------- */
 /*  Mapping helpers: Supabase (snake_case) <-> App types (camelCase)       */
@@ -241,6 +241,45 @@ export async function insertPost(
     .single();
   if (error) throw error;
   return postFromRow(data);
+}
+
+function postCommentFromRow(row: any): PostComment {
+  return {
+    id: row.id,
+    postId: row.post_id,
+    authorName: row.author_name,
+    text: row.text,
+    createdAt: row.created_at,
+  };
+}
+
+/** يجلب كل التعليقات على منشور معيّن في الملتقى. */
+export async function fetchPostComments(postId: string): Promise<PostComment[]> {
+  const { data, error } = await supabase
+    .from("post_comments")
+    .select("*")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data || []).map(postCommentFromRow);
+}
+
+/** يضيف تعليقاً جديداً على منشور في الملتقى (يتطلب تسجيل الدخول). */
+export async function insertPostComment(
+  postId: string,
+  comment: { authorName: string; text: string }
+): Promise<PostComment> {
+  const { data, error } = await supabase
+    .from("post_comments")
+    .insert({
+      post_id: postId,
+      author_name: comment.authorName,
+      text: comment.text,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return postCommentFromRow(data);
 }
 
 export async function likePost(id: string): Promise<void> {

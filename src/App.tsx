@@ -1358,6 +1358,11 @@ export default function App() {
             posts={posts}
             onAddPost={handleAddPost}
             onLikePost={handleLikePost}
+            currentUser={currentUser}
+            onRequireAuth={(message) => {
+              setAuthModalMessage(message);
+              setIsAuthModalOpen(true);
+            }}
           />
         )}
 
@@ -1385,11 +1390,11 @@ export default function App() {
                   <h4 className="text-base font-black text-gray-900 mt-2">رقم الهاتف</h4>
                   <p className="text-xs text-gray-400 font-bold mt-1">تواصل معنا عبر واتساب على مدار الساعة:</p>
                   <p className="text-lg font-black text-brand-700 mt-2 tracking-wide" style={{ direction: "ltr" }}>
-                    00976781003988
+                    00967781003988
                   </p>
                   <div className="mt-4 flex gap-2">
                     <a
-                      href="https://wa.me/00976781003988"
+                      href="https://wa.me/967781003988"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black text-center transition-all"
@@ -1405,7 +1410,6 @@ export default function App() {
                   </h4>
                   <ul className="text-xs text-amber-800 space-y-1.5 font-bold leading-relaxed list-disc pr-4">
                     <li>طلب إضافة عيادة بيطرية جديدة في محافظتك.</li>
-                    <li>المساعدة في استعادة كلمة مرور حسابك.</li>
                     <li>المقترحات والأفكار التطويرية للمنصة.</li>
                   </ul>
                 </div>
@@ -1622,13 +1626,6 @@ export default function App() {
           </div>
         )}
       </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-[#f3ede4] py-8 text-center text-xs font-bold text-gray-400">
-        <div className="max-w-7xl mx-auto px-4 space-y-2">
-          <p>© 2026 منصة أليف اليمن للحيوانات الأليفة. جميع الحقوق محفوظة لإنقاذ ورعاية الحيوان.</p>
-        </div>
-      </footer>
 
       {/* Modals */}
       {selectedPet && (

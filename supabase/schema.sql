@@ -347,6 +347,123 @@ drop policy if exists "aleef_media_delete_owner" on storage.objects;
 create policy "aleef_media_delete_owner" on storage.objects
   for delete using (bucket_id = 'aleef-media' and (auth.uid() = owner or public.is_admin()));
 
+-- ---------------------------------------------------------------------------
+-- 7) post_comments: تعليقات مستخدمي المجتمع على منشورات الملتقى
+-- ---------------------------------------------------------------------------
+create table if not exists public.post_comments (
+  id text primary key default gen_random_uuid()::text,
+  post_id text not null references public.community_posts(id) on delete cascade,
+  author_name text not null,
+  text text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.post_comments enable row level security;
+
+drop policy if exists "post_comments_select_all" on public.post_comments;
+create policy "post_comments_select_all" on public.post_comments
+  for select using (true);
+
+drop policy if exists "post_comments_insert_authenticated" on public.post_comments;
+create policy "post_comments_insert_authenticated" on public.post_comments
+  for insert with check (auth.role() = 'authenticated');
+
+-- الأدمن يقدر يحذف أي تعليق مخالف على منشور
+drop policy if exists "post_comments_delete_admin" on public.post_comments;
+create policy "post_comments_delete_admin" on public.post_comments
+  for delete using (public.is_admin());
+
+-- تحدّث عدّاد التعليقات في community_posts تلقائياً عند إضافة/حذف تعليق
+create or replace function public.refresh_post_comments_count()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  target_post_id text;
+begin
+  target_post_id := coalesce(new.post_id, old.post_id);
+  update public.community_posts
+  set comments_count = (select count(*) from public.post_comments where post_id = target_post_id)
+  where id = target_post_id;
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists on_post_comment_added on public.post_comments;
+create trigger on_post_comment_added
+  after insert on public.post_comments
+  for each row execute procedure public.refresh_post_comments_count();
+
+drop trigger if exists on_post_comment_deleted on public.post_comments;
+create trigger on_post_comment_deleted
+  after delete on public.post_comments
+  for each row execute procedure public.refresh_post_comments_count();
+
+-- ---------------------------------------------------------------------------
+-- 8) تنظيف تلقائي: حذف صور/فيديو أي إعلان حيوان من Storage فور حذف الإعلان نفسه
+-- ---------------------------------------------------------------------------
+create or replace function public.delete_pet_media()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  media_url text;
+  obj_path text;
+begin
+  foreach media_url in array (coalesce(old.image_urls, '{}') || array[old.image_url])
+  loop
+    if media_url is not null and media_url like '%/aleef-media/%' then
+      obj_path := split_part(media_url, '/aleef-media/', 2);
+      if obj_path <> '' then
+        delete from storage.objects where bucket_id = 'aleef-media' and name = obj_path;
+      end if;
+    end if;
+  end loop;
+
+  if old.video_url is not null and old.video_url like '%/aleef-media/%' then
+    obj_path := split_part(old.video_url, '/aleef-media/', 2);
+    if obj_path <> '' then
+      delete from storage.objects where bucket_id = 'aleef-media' and name = obj_path;
+    end if;
+  end if;
+
+  return old;
+end;
+$$;
+
+drop trigger if exists on_pet_deleted_cleanup_media on public.pets;
+create trigger on_pet_deleted_cleanup_media
+  after delete on public.pets
+  for each row execute procedure public.delete_pet_media();
+
+-- ---------------------------------------------------------------------------
+-- 9) حذف تلقائي لأي إعلان بعد مرور 90 يوماً من نشره (يعمل يومياً عبر pg_cron)
+-- ---------------------------------------------------------------------------
+create extension if not exists pg_cron;
+
+create or replace function public.delete_expired_pets()
+returns void
+language sql
+security definer set search_path = public
+as $$
+  delete from public.pets where created_at < now() - interval '90 days';
+$$;
+
+do $$
+begin
+  perform cron.unschedule('delete-expired-pets-daily');
+exception when others then
+  null; -- أول مرة تشغيل الملف، الجدولة غير موجودة بعد، وهذا متوقع
+end $$;
+
+select cron.schedule(
+  'delete-expired-pets-daily',
+  '0 3 * * *', -- كل يوم الساعة 3:00 صباحاً بتوقيت UTC
+  $$ select public.delete_expired_pets(); $$
+);
+
 -- ============================================================================
 -- انتهى المخطط بالكامل ✅
 --

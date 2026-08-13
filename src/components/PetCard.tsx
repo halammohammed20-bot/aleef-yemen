@@ -221,7 +221,14 @@ export default function PetCard({ pet, onViewDetails, isFavorite = false, onTogg
             <div className="w-7 h-7 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 text-xs font-black">
               {pet.ownerName.charAt(0)}
             </div>
-            <span className="text-xs font-bold text-gray-600">{pet.ownerName}</span>
+            <div className="flex flex-col">
+              <span className="text-xs font-bold text-gray-600">{pet.ownerName}</span>
+              {pet.createdAt && (
+                <span className="text-[10px] text-gray-400 font-bold">
+                  نُشر {new Date(pet.createdAt).toLocaleDateString("ar-EG", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              )}
+            </div>
           </div>
 
           <button

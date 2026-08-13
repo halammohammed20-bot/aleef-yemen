@@ -1,14 +1,17 @@
 import React, { useState } from "react";
-import { BookOpen, Heart, MessageSquare, Plus, PenTool, Sparkles, Send } from "lucide-react";
-import { CommunityPost } from "../types";
+import { BookOpen, Heart, MessageSquare, Plus, PenTool, Sparkles, Send, Loader2 } from "lucide-react";
+import { CommunityPost, PostComment, UserAccount } from "../types";
+import { fetchPostComments, insertPostComment } from "../lib/db";
 
 interface CommunityHubProps {
   posts: CommunityPost[];
   onAddPost: (post: Omit<CommunityPost, "id" | "likes" | "commentsCount" | "createdAt">) => void;
   onLikePost: (id: string) => void;
+  currentUser: UserAccount | null;
+  onRequireAuth: (message: string) => void;
 }
 
-export default function CommunityHub({ posts, onAddPost, onLikePost }: CommunityHubProps) {
+export default function CommunityHub({ posts, onAddPost, onLikePost, currentUser, onRequireAuth }: CommunityHubProps) {
   const [activeFilter, setActiveFilter] = useState<"all" | "tips" | "stories">("all");
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -23,6 +26,60 @@ export default function CommunityHub({ posts, onAddPost, onLikePost }: Community
     if (activeFilter === "all") return true;
     return post.category === activeFilter;
   });
+
+  /* --------------------------- Comments state --------------------------- */
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  const [commentsByPost, setCommentsByPost] = useState<Record<string, PostComment[]>>({});
+  const [commentsLoading, setCommentsLoading] = useState<string | null>(null);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentError, setCommentError] = useState("");
+
+  const handleToggleComments = async (postId: string) => {
+    if (expandedPostId === postId) {
+      setExpandedPostId(null);
+      return;
+    }
+    setExpandedPostId(postId);
+    setCommentError("");
+    if (!commentsByPost[postId]) {
+      setCommentsLoading(postId);
+      try {
+        const data = await fetchPostComments(postId);
+        setCommentsByPost((prev) => ({ ...prev, [postId]: data }));
+      } catch {
+        setCommentError("تعذر تحميل التعليقات. حاول مرة أخرى.");
+      } finally {
+        setCommentsLoading(null);
+      }
+    }
+  };
+
+  const handleAddComment = async (postId: string) => {
+    if (!currentUser) {
+      onRequireAuth("الرجاء تسجيل الدخول أولاً لتتمكن من التعليق على المنشورات 💬");
+      return;
+    }
+    if (!commentDraft.trim()) return;
+
+    setCommentSubmitting(true);
+    setCommentError("");
+    try {
+      const newComment = await insertPostComment(postId, {
+        authorName: currentUser.username,
+        text: commentDraft.trim(),
+      });
+      setCommentsByPost((prev) => ({
+        ...prev,
+        [postId]: [...(prev[postId] || []), newComment],
+      }));
+      setCommentDraft("");
+    } catch {
+      setCommentError("تعذر إرسال التعليق. حاول مرة أخرى.");
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,16 +289,76 @@ export default function CommunityHub({ posts, onAddPost, onLikePost }: Community
               <div className="pt-4 border-t border-gray-50 flex items-center gap-4 text-xs font-bold text-gray-500">
                 <button
                   onClick={() => onLikePost(post.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all cursor-pointer"
                 >
                   <Heart className="w-4 h-4 text-rose-500 fill-rose-50" />
                   أعجبني ({post.likes})
                 </button>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg">
+                <button
+                  onClick={() => handleToggleComments(post.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                    expandedPostId === post.id ? "bg-brand-50 text-brand-700" : "bg-gray-50 hover:bg-gray-100"
+                  }`}
+                >
                   <MessageSquare className="w-4 h-4 text-gray-400" />
                   التعليقات ({post.commentsCount})
-                </div>
+                </button>
               </div>
+
+              {/* Comments Section */}
+              {expandedPostId === post.id && (
+                <div className="pt-4 border-t border-gray-50 space-y-3">
+                  {commentsLoading === post.id ? (
+                    <div className="flex items-center justify-center gap-2 py-6 text-gray-400">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-xs font-bold">جاري تحميل التعليقات...</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {(commentsByPost[post.id] || []).length === 0 ? (
+                        <p className="text-xs text-gray-400 font-bold text-center py-3">لا توجد تعليقات بعد. كن أول من يعلّق!</p>
+                      ) : (
+                        commentsByPost[post.id].map((cm) => (
+                          <div key={cm.id} className="flex items-start gap-2.5 p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                            <div className="w-7 h-7 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center text-[11px] font-black shrink-0">
+                              {cm.authorName.charAt(0)}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="block text-xs font-black text-gray-800">{cm.authorName}</span>
+                              <p className="text-xs text-gray-600 font-semibold leading-relaxed">{cm.text}</p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {commentError && (
+                    <p className="text-[11px] font-bold text-rose-600 bg-rose-50 p-2.5 rounded-xl border border-rose-100">{commentError}</p>
+                  )}
+
+                  {/* Add comment box */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <input
+                      type="text"
+                      value={commentDraft}
+                      onChange={(e) => setCommentDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddComment(post.id);
+                      }}
+                      placeholder={currentUser ? "اكتب تعليقك هنا..." : "سجّل الدخول لإضافة تعليق..."}
+                      className="flex-1 px-3.5 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-semibold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all"
+                    />
+                    <button
+                      onClick={() => handleAddComment(post.id)}
+                      disabled={commentSubmitting}
+                      className="p-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl transition-all cursor-pointer disabled:opacity-60 shrink-0"
+                    >
+                      {commentSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 rotate-180" />}
+                    </button>
+                  </div>
+                </div>
+              )}
             </article>
           ))
         )}

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { X, Check, ArrowRight, ShieldCheck, Camera, Sparkles, Upload, Calendar, HelpCircle, Plus } from "lucide-react";
 import { PetListing, PetCategory, PetPurpose } from "../types";
 import { CITIES_YEMEN, GOVERNORATES_YEMEN, CITIES_BY_GOVERNORATE } from "../data";
-import { uploadMedia, validateImageFile, validateVideoFile } from "../lib/storage";
+import { uploadMedia, validateImageFile, validateVideoFile, ImageQualityLevel } from "../lib/storage";
 
 interface AddPetModalProps {
   onClose: () => void;
@@ -82,6 +82,7 @@ export default function AddPetModal({
   const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoUploadProgress, setVideoUploadProgress] = useState(false);
   const [imageUploadProgress, setImageUploadProgress] = useState(false);
+  const [imageQuality, setImageQuality] = useState<ImageQualityLevel>("medium");
 
   // Handle local device file upload: يرفع الصور مباشرة إلى Supabase Storage
   // ويحفظ روابطها العامة (public URLs) بدل تخزينها كـ base64 ضخم داخل قاعدة البيانات.
@@ -110,7 +111,7 @@ export default function AddPetModal({
     try {
       const uploaded: string[] = [];
       for (const file of validFiles) {
-        const url = await uploadMedia(file, "pets");
+        const url = await uploadMedia(file, "pets", imageQuality);
         uploaded.push(url);
       }
       setImageUrls((prev) => {
@@ -500,7 +501,32 @@ export default function AddPetModal({
             {/* UPLOADER / Photo Selection with Multi-image gallery support */}
             <div className="space-y-4">
               <label className="block text-xs font-black text-gray-700">صور الأليف * (يرجى رفع صور حقيقية من جهازك، يمكنك اختيار أو رفع أكثر من صورة):</label>
-              
+
+              {/* Image Size / Quality Control */}
+              <div className="flex items-center gap-2 p-2.5 bg-gray-50 rounded-2xl border border-gray-100">
+                <span className="text-[11px] font-black text-gray-500 shrink-0 px-1">حجم الصور بعد الرفع:</span>
+                <div className="flex-1 grid grid-cols-3 gap-1.5">
+                  {([
+                    { value: "small", label: "أصغر حجم 📉" },
+                    { value: "medium", label: "متوازن (موصى به)" },
+                    { value: "high", label: "أعلى جودة 📈" },
+                  ] as { value: ImageQualityLevel; label: string }[]).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setImageQuality(opt.value)}
+                      className={`py-1.5 rounded-xl text-[10px] font-black transition-all cursor-pointer ${
+                        imageQuality === opt.value
+                          ? "bg-brand-600 text-white shadow-xs"
+                          : "bg-white text-gray-500 border border-gray-200 hover:bg-gray-100"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="flex flex-col md:flex-row gap-5 items-stretch">
                 {/* Active Image Preview Box with scrolling thumbnails inside */}
                 <div className="relative w-full md:w-1/2 aspect-video md:aspect-square bg-gray-100 rounded-3xl overflow-hidden border border-[#f3ede4] flex flex-col justify-between p-4 shadow-xs">
@@ -770,6 +796,13 @@ export default function AddPetModal({
                 </div>
               </div>
             </div>
+
+            {/* Auto-expiry notice */}
+            {!editingPet && (
+              <p className="text-[11px] text-gray-400 font-bold text-center bg-gray-50 rounded-xl py-2 px-3">
+                ℹ️ ملاحظة: يُحذف هذا الإعلان تلقائياً بعد مرور 90 يوماً من تاريخ نشره للحفاظ على تحديث المحتوى المعروض في المنصة.
+              </p>
+            )}
 
             {/* Footer buttons inside scrolling container to ensure visible */}
             <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-3">
