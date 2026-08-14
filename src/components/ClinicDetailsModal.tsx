@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import { X, MapPin, Phone, Star, ShieldAlert, Check, Clock, MessageSquare, Upload, Plus, Sparkles, Image as ImageIcon } from "lucide-react";
 import { Clinic, ClinicComment } from "../types";
 import { uploadMedia, validateImageFile } from "../lib/storage";
+import ImageCropper from "./ImageCropper";
 
 interface ClinicDetailsModalProps {
   clinic: Clinic | null;
@@ -61,31 +62,35 @@ export default function ClinicDetailsModal({
   };
 
   const [imageUploadProgress, setImageUploadProgress] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
-  // Handle device image upload: يرفع صورة العيادة إلى Supabase Storage ويحفظ رابطها العام
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  // Handle device image upload: يفتح أداة الاقتصاص أولاً، ثم يرفع الصورة المُقتصَّة
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
     setError("");
+    const err = validateImageFile(file);
+    if (err) {
+      setError(err);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    setCropFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleCropConfirm = async (croppedFile: File) => {
+    setCropFile(null);
     setImageUploadProgress(true);
     try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const err = validateImageFile(file);
-        if (err) {
-          setError(err);
-          continue;
-        }
-        const url = await uploadMedia(file, "clinics");
-        onAddImage(clinic.id, url);
-        setActiveImageIndex(images.length); // Next index
-      }
+      const url = await uploadMedia(croppedFile, "clinics");
+      onAddImage(clinic.id, url);
+      setActiveImageIndex(images.length);
     } catch (err: any) {
       setError(err?.message || "تعذر رفع الصورة. حاول مرة أخرى.");
     } finally {
       setImageUploadProgress(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -396,6 +401,10 @@ export default function ClinicDetailsModal({
           </div>
         </div>
       </div>
+
+      {cropFile && (
+        <ImageCropper file={cropFile} onCancel={() => setCropFile(null)} onConfirm={handleCropConfirm} />
+      )}
     </div>
   );
 }
