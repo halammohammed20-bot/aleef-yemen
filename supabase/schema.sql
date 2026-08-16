@@ -417,30 +417,23 @@ drop trigger if exists on_pet_deleted_cleanup_media on public.pets;
 drop function if exists public.delete_pet_media();
 
 -- ---------------------------------------------------------------------------
--- 9) حذف تلقائي لأي إعلان بعد مرور 90 يوماً من نشره (يعمل يومياً عبر pg_cron)
+-- 9) حذف تلقائي لأي إعلان بعد مرور 90 يوماً من نشره
 -- ---------------------------------------------------------------------------
-create extension if not exists pg_cron;
-
-create or replace function public.delete_expired_pets()
-returns void
-language sql
-security definer set search_path = public
-as $$
-  delete from public.pets where created_at < now() - interval '90 days';
-$$;
-
+-- ملاحظة: هذا الحذف التلقائي لا يُنفَّذ من قاعدة البيانات مباشرة (pg_cron)
+-- لأن ذلك كان يحذف صف الإعلان فقط بدون صوره من Storage (نفس القيد الذي
+-- يمنع حذف ملفات Storage عبر SQL المذكور في القسم 8 أعلاه). لذلك نُفَّذ
+-- هذا التنظيف بالكامل (حذف الصور + حذف الإعلان) عبر وظيفة مجدولة على
+-- Vercel (Vercel Cron) موجودة في: api/cron/expire-pets.ts، تعمل يومياً
+-- الساعة 3:00 صباحاً UTC وتستخدم صلاحية service role للوصول الكامل.
+--
+-- إن كنت شغّلت نسخة أقدم من هذا الملف كانت تُفعّل pg_cron لهذا الغرض،
+-- هذا يزيل تلك الجدولة القديمة بأمان (تجاهل الخطأ إن لم تكن موجودة):
 do $$
 begin
   perform cron.unschedule('delete-expired-pets-daily');
 exception when others then
-  null; -- أول مرة تشغيل الملف، الجدولة غير موجودة بعد، وهذا متوقع
+  null;
 end $$;
-
-select cron.schedule(
-  'delete-expired-pets-daily',
-  '0 3 * * *', -- كل يوم الساعة 3:00 صباحاً بتوقيت UTC
-  $$ select public.delete_expired_pets(); $$
-);
 
 -- ============================================================================
 -- انتهى المخطط بالكامل ✅
