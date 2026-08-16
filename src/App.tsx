@@ -199,7 +199,9 @@ export default function App() {
     if (deleteConfirmId === id) {
       (async () => {
         try {
-          await deletePet(id);
+          const targetPet = pets.find((p) => p.id === id);
+          if (!targetPet) throw new Error("لم يتم العثور على الإعلان");
+          await deletePet(targetPet);
           setPets((prev) => prev.filter((p) => p.id !== id));
         } catch (err) {
           console.error("فشل حذف الأليف:", err);

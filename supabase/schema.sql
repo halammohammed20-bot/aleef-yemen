@@ -401,42 +401,20 @@ create trigger on_post_comment_deleted
   for each row execute procedure public.refresh_post_comments_count();
 
 -- ---------------------------------------------------------------------------
--- 8) تنظيف تلقائي: حذف صور/فيديو أي إعلان حيوان من Storage فور حذف الإعلان نفسه
+-- 8) تنظيف الصور من Storage عند حذف إعلان حيوان
 -- ---------------------------------------------------------------------------
-create or replace function public.delete_pet_media()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
-declare
-  media_url text;
-  obj_path text;
-begin
-  foreach media_url in array (coalesce(old.image_urls, '{}') || array[old.image_url])
-  loop
-    if media_url is not null and media_url like '%/aleef-media/%' then
-      obj_path := split_part(media_url, '/aleef-media/', 2);
-      if obj_path <> '' then
-        delete from storage.objects where bucket_id = 'aleef-media' and name = obj_path;
-      end if;
-    end if;
-  end loop;
-
-  if old.video_url is not null and old.video_url like '%/aleef-media/%' then
-    obj_path := split_part(old.video_url, '/aleef-media/', 2);
-    if obj_path <> '' then
-      delete from storage.objects where bucket_id = 'aleef-media' and name = obj_path;
-    end if;
-  end if;
-
-  return old;
-end;
-$$;
-
+-- ملاحظة مهمة: لا يمكن تنفيذ هذا عبر SQL Trigger لأن Supabase تمنع صراحةً
+-- أي حذف مباشر (DELETE) على جدول storage.objects عبر SQL، حتى من دوال
+-- الأدمن أو الـ security definer (الخطأ: "Direct deletion from storage
+-- tables is not allowed. Use the Storage API instead"). لذلك تنظيف الصور
+-- يتم من داخل التطبيق نفسه (src/lib/db.ts -> deletePet) عبر Storage API
+-- الرسمية مباشرة قبل حذف صف الإعلان، وليس من قاعدة البيانات.
+--
+-- إن سبق وشغّلت نسخة أقدم من هذا الملف كانت تحتوي دالة/Trigger باسم
+-- delete_pet_media / on_pet_deleted_cleanup_media، هذا السطر يزيلهما
+-- بأمان لأنهما كانا يفشلان دائماً بصمت دون أي فائدة فعلية:
 drop trigger if exists on_pet_deleted_cleanup_media on public.pets;
-create trigger on_pet_deleted_cleanup_media
-  after delete on public.pets
-  for each row execute procedure public.delete_pet_media();
+drop function if exists public.delete_pet_media();
 
 -- ---------------------------------------------------------------------------
 -- 9) حذف تلقائي لأي إعلان بعد مرور 90 يوماً من نشره (يعمل يومياً عبر pg_cron)

@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient";
 import { PetListing, Clinic, ClinicComment, CommunityPost, UserAccount, PostComment } from "../types";
+import { MEDIA_BUCKET } from "./storage";
 
 /* ---------------------------------------------------------------------- */
 /*  Mapping helpers: Supabase (snake_case) <-> App types (camelCase)       */
@@ -155,8 +156,39 @@ export async function updatePet(
   return petFromRow(data);
 }
 
-export async function deletePet(id: string): Promise<void> {
-  const { error } = await supabase.from("pets").delete().eq("id", id);
+/**
+ * يستخرج مسار الملف داخل bucket "aleef-media" من رابطه العام الكامل.
+ * مثال: ".../object/public/aleef-media/pets/123-abc.jpg" -> "pets/123-abc.jpg"
+ */
+function extractMediaPath(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const marker = "/aleef-media/";
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return url.slice(idx + marker.length);
+}
+
+export async function deletePet(pet: PetListing): Promise<void> {
+  // أولاً: نحذف كل الصور والفيديو المرتبطة بالإعلان من Storage.
+  // الحذف المباشر عبر SQL على storage.objects ممنوع من Supabase نفسها لأسباب أمنية
+  // (Direct deletion from storage tables is not allowed)، لذلك الحذف الصحيح
+  // الوحيد الممكن هو عبر Storage API من هنا في التطبيق.
+  const paths = [
+    ...(pet.imageUrls || []),
+    pet.imageUrl,
+    pet.videoUrl,
+  ]
+    .map(extractMediaPath)
+    .filter((p): p is string => !!p);
+
+  const uniquePaths = Array.from(new Set(paths));
+  if (uniquePaths.length > 0) {
+    // لا نوقف عملية الحذف لو فشل تنظيف الصور لأي سبب (رابط قديم، صورة محذوفة مسبقاً...)
+    await supabase.storage.from(MEDIA_BUCKET).remove(uniquePaths).catch(() => null);
+  }
+
+  // ثانياً: نحذف صف الإعلان نفسه من قاعدة البيانات
+  const { error } = await supabase.from("pets").delete().eq("id", pet.id);
   if (error) throw error;
 }
 
