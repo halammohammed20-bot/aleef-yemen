@@ -1,5 +1,5 @@
 import { supabase } from "./supabaseClient";
-import { PetListing, Clinic, ClinicComment, CommunityPost, UserAccount, PostComment } from "../types";
+import { PetListing, Clinic, ClinicComment, CommunityPost, UserAccount, PostComment, ContactMessage } from "../types";
 import { MEDIA_BUCKET } from "./storage";
 
 /* ---------------------------------------------------------------------- */
@@ -463,5 +463,48 @@ export async function deleteClinicComment(id: string): Promise<void> {
 /** يحذف منشوراً من ملتقى المجتمع. متاح فقط للأدمن بموجب RLS. */
 export async function deletePost(id: string): Promise<void> {
   const { error } = await supabase.from("community_posts").delete().eq("id", id);
+  if (error) throw error;
+}
+
+function contactMessageFromRow(row: any): ContactMessage {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    message: row.message,
+    isRead: !!row.is_read,
+    createdAt: row.created_at,
+  };
+}
+
+/** يرسل رسالة تواصل جديدة من نموذج "تواصل مع الإدارة". متاح لأي زائر حتى بدون تسجيل دخول. */
+export async function sendContactMessage(data: { name: string; phone: string; message: string }): Promise<void> {
+  const { error } = await supabase.from("contact_messages").insert({
+    name: data.name,
+    phone: data.phone,
+    message: data.message,
+  });
+  if (error) throw error;
+}
+
+/** يجلب كل رسائل التواصل. متاح فقط للأدمن بموجب RLS. */
+export async function fetchContactMessages(): Promise<ContactMessage[]> {
+  const { data, error } = await supabase
+    .from("contact_messages")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data || []).map(contactMessageFromRow);
+}
+
+/** يعلّم رسالة تواصل كمقروءة. متاح فقط للأدمن بموجب RLS. */
+export async function markContactMessageRead(id: string): Promise<void> {
+  const { error } = await supabase.from("contact_messages").update({ is_read: true }).eq("id", id);
+  if (error) throw error;
+}
+
+/** يحذف رسالة تواصل. متاح فقط للأدمن بموجب RLS. */
+export async function deleteContactMessage(id: string): Promise<void> {
+  const { error } = await supabase.from("contact_messages").delete().eq("id", id);
   if (error) throw error;
 }

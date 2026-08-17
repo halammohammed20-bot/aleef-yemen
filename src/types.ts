@@ -78,6 +78,15 @@ export interface PostComment {
   createdAt: string;
 }
 
+export interface ContactMessage {
+  id: string;
+  name: string;
+  phone: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "model";

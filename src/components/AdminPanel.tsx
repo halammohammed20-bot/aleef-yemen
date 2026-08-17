@@ -13,8 +13,10 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Mail,
+  MailOpen,
 } from "lucide-react";
-import { PetListing, Clinic, CommunityPost, UserAccount } from "../types";
+import { PetListing, Clinic, CommunityPost, UserAccount, ContactMessage } from "../types";
 import {
   fetchAllUsers,
   setUserRole,
@@ -23,6 +25,9 @@ import {
   deleteClinic,
   deleteClinicComment,
   deletePost,
+  fetchContactMessages,
+  markContactMessageRead,
+  deleteContactMessage,
   AdminUserRow,
 } from "../lib/db";
 
@@ -39,7 +44,7 @@ interface AdminPanelProps {
   onPostsChange: (posts: CommunityPost[]) => void;
 }
 
-type AdminTab = "overview" | "pets" | "clinics" | "community" | "users";
+type AdminTab = "overview" | "pets" | "clinics" | "community" | "messages" | "users";
 
 const emptyClinicForm = {
   name: "",
@@ -104,6 +109,58 @@ export default function AdminPanel({
       alert(err?.message || "تعذر تحديث الصلاحية. حاول مرة أخرى.");
     }
   };
+
+  /* ------------------------------ Messages tab ------------------------------ */
+  const [messages, setMessages] = useState<ContactMessage[]>([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesError, setMessagesError] = useState("");
+  const [messageDeleteIntent, setMessageDeleteIntent] = useState<string | null>(null);
+
+  const loadMessages = async () => {
+    setMessagesLoading(true);
+    setMessagesError("");
+    try {
+      const data = await fetchContactMessages();
+      setMessages(data);
+    } catch (err: any) {
+      setMessagesError(err?.message || "تعذر تحميل الرسائل.");
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleMarkRead = async (msg: ContactMessage) => {
+    if (msg.isRead) return;
+    try {
+      await markContactMessageRead(msg.id);
+      setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, isRead: true } : m)));
+    } catch {
+      // تجاهل الخطأ هنا، ليس حرجاً
+    }
+  };
+
+  const handleDeleteMessage = async (id: string) => {
+    if (messageDeleteIntent !== id) {
+      setMessageDeleteIntent(id);
+      setTimeout(() => setMessageDeleteIntent((prev) => (prev === id ? null : prev)), 4000);
+      return;
+    }
+    try {
+      await deleteContactMessage(id);
+      setMessages((prev) => prev.filter((m) => m.id !== id));
+    } catch (err: any) {
+      alert(err?.message || "تعذر حذف الرسالة.");
+    } finally {
+      setMessageDeleteIntent(null);
+    }
+  };
+
+  const unreadMessagesCount = messages.filter((m) => !m.isRead).length;
 
   /* -------------------------- Pets tab (delete) --------------------------- */
   const [petDeleteIntent, setPetDeleteIntent] = useState<string | null>(null);
@@ -240,11 +297,12 @@ export default function AdminPanel({
   };
 
   /* --------------------------------- Tabs UI --------------------------------- */
-  const tabs: { id: AdminTab; label: string; icon: any }[] = [
+  const tabs: { id: AdminTab; label: string; icon: any; badge?: number }[] = [
     { id: "overview", label: "نظرة عامة", icon: ShieldCheck },
     { id: "pets", label: "الحيوانات", icon: PawPrint },
     { id: "clinics", label: "العيادات", icon: Stethoscope },
     { id: "community", label: "المجتمع والتعليقات", icon: MessageSquare },
+    { id: "messages", label: "الرسائل الواردة", icon: Mail, badge: unreadMessagesCount },
     { id: "users", label: "المستخدمون", icon: Users },
   ];
 
@@ -290,6 +348,11 @@ export default function AdminPanel({
                 >
                   <Icon className="w-4 h-4" />
                   {t.label}
+                  {!!t.badge && (
+                    <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-rose-500 text-white text-[10px] font-black rounded-full">
+                      {t.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -583,6 +646,80 @@ export default function AdminPanel({
                       >
                         {postDeleteIntent === post.id ? "تأكيد ⚠️" : "حذف"}
                       </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* MESSAGES */}
+            {tab === "messages" && (
+              <div className="space-y-2.5">
+                {messagesError && (
+                  <div className="p-3 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold rounded-xl">
+                    {messagesError}
+                  </div>
+                )}
+                {messagesLoading ? (
+                  <div className="flex items-center justify-center py-10 text-gray-400 gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-xs font-bold">جاري التحميل...</span>
+                  </div>
+                ) : messages.length === 0 ? (
+                  <p className="text-xs text-gray-400 font-bold text-center py-8">
+                    لا توجد رسائل واردة بعد. الرسائل المُرسلة من صفحة "تواصل مع الإدارة" في الموقع تظهر هنا.
+                  </p>
+                ) : (
+                  messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      onClick={() => handleMarkRead(msg)}
+                      className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                        msg.isRead ? "bg-gray-50 border-gray-100" : "bg-brand-50/50 border-brand-100"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 shrink-0">
+                          {msg.isRead ? (
+                            <MailOpen className="w-4 h-4 text-gray-400" />
+                          ) : (
+                            <Mail className="w-4 h-4 text-brand-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-black text-gray-900">{msg.name}</span>
+                            <span className="text-[10px] text-gray-400 font-bold shrink-0">
+                              {new Date(msg.createdAt).toLocaleDateString("ar-EG", { day: "numeric", month: "short" })}
+                            </span>
+                          </div>
+                          <a
+                            href={`https://wa.me/${msg.phone.replace(/\D/g, "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[11px] text-emerald-600 font-bold hover:underline"
+                            style={{ direction: "ltr", display: "inline-block" }}
+                          >
+                            {msg.phone} 💬
+                          </a>
+                          <p className="text-xs text-gray-700 font-semibold mt-1.5 leading-relaxed">{msg.message}</p>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteMessage(msg.id);
+                          }}
+                          className={`p-2 rounded-xl transition-all cursor-pointer shrink-0 ${
+                            messageDeleteIntent === msg.id
+                              ? "bg-red-600 text-white animate-pulse"
+                              : "bg-white hover:bg-rose-50 text-rose-500 border border-gray-200"
+                          }`}
+                          title="حذف الرسالة"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   ))
                 )}

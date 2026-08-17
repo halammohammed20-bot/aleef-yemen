@@ -30,6 +30,7 @@ import {
   addFavorite,
   removeFavorite,
   fetchUserAccount,
+  sendContactMessage,
 } from "./lib/db";
 
 export default function App() {
@@ -46,6 +47,10 @@ export default function App() {
   const [authModalMessage, setAuthModalMessage] = useState("");
   const [profileSubTab, setProfileSubTab] = useState<"added" | "favorites">("added");
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [contactForm, setContactForm] = useState({ name: "", phone: "", message: "" });
+  const [contactSubmitting, setContactSubmitting] = useState(false);
+  const [contactError, setContactError] = useState("");
+  const [contactSuccess, setContactSuccess] = useState(false);
   
   // Localized state with localStorage sync
   const [pets, setPets] = useState<PetListing[]>([]);
@@ -1422,19 +1427,46 @@ export default function App() {
                 <h3 className="text-lg font-black text-gray-900 mb-4">أرسل رسالة سريعة للإدارة:</h3>
 
                 <form
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
-                    const form = e.target as HTMLFormElement;
-                    alert("تم إرسال رسالتك بنجاح لطاقم إدارة أليف اليمن! سنقوم بالرد عليك عبر الهاتف أو الواتساب فوراً. ❤️");
-                    form.reset();
+                    if (!contactForm.name.trim() || !contactForm.phone.trim() || !contactForm.message.trim()) return;
+                    setContactSubmitting(true);
+                    setContactError("");
+                    try {
+                      await sendContactMessage({
+                        name: contactForm.name.trim(),
+                        phone: contactForm.phone.trim(),
+                        message: contactForm.message.trim(),
+                      });
+                      setContactForm({ name: "", phone: "", message: "" });
+                      setContactSuccess(true);
+                      setTimeout(() => setContactSuccess(false), 5000);
+                    } catch (err: any) {
+                      setContactError(err?.message || "تعذر إرسال رسالتك. الرجاء المحاولة مرة أخرى أو التواصل عبر واتساب.");
+                    } finally {
+                      setContactSubmitting(false);
+                    }
                   }}
                   className="space-y-4"
                 >
+                  {contactSuccess && (
+                    <div className="p-3 bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold rounded-xl text-center">
+                      تم إرسال رسالتك بنجاح لطاقم إدارة أليف اليمن! سنقوم بالرد عليك عبر الهاتف أو الواتساب فوراً. ❤️
+                    </div>
+                  )}
+                  {contactError && (
+                    <div className="p-3 bg-rose-50 border border-rose-100 text-rose-700 text-xs font-bold rounded-xl text-center">
+                      {contactError}
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-xs font-black text-gray-700 mb-1.5">الاسم الكريم *</label>
                     <input
                       type="text"
                       required
+                      value={contactForm.name}
+                      onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
                       placeholder="مثال: محمد اليماني..."
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all text-right"
                     />
@@ -1445,6 +1477,8 @@ export default function App() {
                     <input
                       type="tel"
                       required
+                      value={contactForm.phone}
+                      onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
                       placeholder="مثال: 77XXXXXXX"
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all text-left"
                       style={{ direction: "ltr" }}
@@ -1456,6 +1490,8 @@ export default function App() {
                     <textarea
                       required
                       rows={4}
+                      value={contactForm.message}
+                      onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
                       placeholder="اكتب هنا تفاصيل طلبك أو العيادة التي تود إضافتها مع العنوان والخدمات..."
                       className="w-full px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl text-sm font-semibold text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:bg-white transition-all text-right"
                     />
@@ -1463,9 +1499,10 @@ export default function App() {
 
                   <button
                     type="submit"
-                    className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-black shadow-lg shadow-brand-600/10 transition-all cursor-pointer"
+                    disabled={contactSubmitting}
+                    className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-black shadow-lg shadow-brand-600/10 transition-all cursor-pointer disabled:opacity-60"
                   >
-                    إرسال الرسالة للإدارة
+                    {contactSubmitting ? "جاري الإرسال..." : "إرسال الرسالة للإدارة"}
                   </button>
                 </form>
               </div>

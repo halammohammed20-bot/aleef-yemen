@@ -435,6 +435,38 @@ exception when others then
   null;
 end $$;
 
+-- ---------------------------------------------------------------------------
+-- 10) contact_messages: رسائل نموذج "تواصل مع الإدارة"
+-- ---------------------------------------------------------------------------
+create table if not exists public.contact_messages (
+  id text primary key default gen_random_uuid()::text,
+  name text not null,
+  phone text not null,
+  message text not null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+alter table public.contact_messages enable row level security;
+
+-- أي زائر (حتى غير مسجل دخول) يقدر يرسل رسالة من صفحة "تواصل مع الإدارة"
+drop policy if exists "contact_messages_insert_public" on public.contact_messages;
+create policy "contact_messages_insert_public" on public.contact_messages
+  for insert with check (true);
+
+-- قراءة الرسائل مقصورة على الأدمن فقط (تحتوي أرقام هواتف المرسلين)
+drop policy if exists "contact_messages_select_admin" on public.contact_messages;
+create policy "contact_messages_select_admin" on public.contact_messages
+  for select using (public.is_admin());
+
+drop policy if exists "contact_messages_update_admin" on public.contact_messages;
+create policy "contact_messages_update_admin" on public.contact_messages
+  for update using (public.is_admin());
+
+drop policy if exists "contact_messages_delete_admin" on public.contact_messages;
+create policy "contact_messages_delete_admin" on public.contact_messages
+  for delete using (public.is_admin());
+
 -- ============================================================================
 -- انتهى المخطط بالكامل ✅
 --
