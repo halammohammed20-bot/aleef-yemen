@@ -32,6 +32,7 @@ export default function ImageCropper({ file, onCancel, onConfirm, queueLabel }: 
   const [renderedSize, setRenderedSize] = useState({ w: 0, h: 0 });
   const [box, setBox] = useState<Box>({ x: 20, y: 20, w: 200, h: 200 });
   const [processing, setProcessing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const dragState = useRef<{
     mode: "move" | "resize" | null;
@@ -44,20 +45,50 @@ export default function ImageCropper({ file, onCancel, onConfirm, queueLabel }: 
   useEffect(() => {
     const url = URL.createObjectURL(file);
     setImgUrl(url);
-    return () => URL.revokeObjectURL(url);
+    // شبكة أمان: لو الصورة ما اكتمل تحميلها أو فشلت خلال 4 ثوانٍ (بعض المتصفحات
+    // على الجوال لا تُطلق onLoad ولا onError لصيغ غير مدعومة مثل HEIC القديمة)
+    // نعرض تلقائياً خيار "رفع كما هي بدون اقتصاص" حتى لا يبقى المستخدم عالقاً.
+    const safetyTimer = setTimeout(() => {
+      setRenderedSize((prev) => {
+        if (prev.w === 0) setLoadError(true);
+        return prev;
+      });
+    }, 4000);
+    return () => {
+      URL.revokeObjectURL(url);
+      clearTimeout(safetyTimer);
+    };
   }, [file]);
 
-  const handleImageLoad = () => {
+  const measureImage = () => {
     const img = imgRef.current;
-    if (!img) return;
+    if (!img || !img.naturalWidth) return;
     setNaturalSize({ w: img.naturalWidth, h: img.naturalHeight });
     const rect = img.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return; // لسا ما اكتمل الـ layout، الخطوة التالية بتعيد المحاولة
     setRenderedSize({ w: rect.width, h: rect.height });
-    // إطار اقتصاص ابتدائي يغطي 80% من منتصف الصورة
-    const w = rect.width * 0.8;
-    const h = rect.height * 0.8;
-    setBox({ x: (rect.width - w) / 2, y: (rect.height - h) / 2, w, h });
+    // إطار اقتصاص ابتدائي يغطي 80% من منتصف الصورة (فقط أول مرة)
+    setBox((prev) => {
+      if (prev.w > MIN_BOX_SIZE + 1) return prev; // لا تصفّر الإطار لو المستخدم عدّله مسبقاً
+      const w = rect.width * 0.8;
+      const h = rect.height * 0.8;
+      return { x: (rect.width - w) / 2, y: (rect.height - h) / 2, w, h };
+    });
   };
+
+  const handleImageLoad = () => {
+    // نؤجل القياس بخطوة رسم واحدة لضمان اكتمال الـ layout فعلياً على الجوال
+    // (متصفحات الجوال أحياناً تحسب أبعاد العنصر بشكل غير دقيق فور onLoad مباشرة)
+    requestAnimationFrame(() => requestAnimationFrame(measureImage));
+  };
+
+  // إعادة القياس تلقائياً لو تغيّر حجم الشاشة (مثل اختفاء/ظهور شريط المتصفح على الجوال)
+  useEffect(() => {
+    const handleResize = () => measureImage();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const clampBox = useCallback(
     (b: Box): Box => {
@@ -162,23 +193,23 @@ export default function ImageCropper({ file, onCancel, onConfirm, queueLabel }: 
   const estimatedKb = Math.round((outputW * outputH * 0.25) / 1024); // تقدير تقريبي فقط قبل الضغط الفعلي
 
   return (
-    <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" dir="rtl">
-      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4" dir="rtl">
+      <div className="w-full max-w-2xl max-h-[95vh] bg-white rounded-3xl shadow-2xl overflow-y-auto flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
+        <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
           <div>
             <h3 className="text-sm font-black text-gray-900">اقتصاص وتحكم بحجم الصورة ✂️</h3>
             <p className="text-[11px] text-gray-400 font-bold mt-0.5">
               اسحب الإطار لتحريكه، واسحب الزوايا لتكبيره أو تصغيره {queueLabel && `· ${queueLabel}`}
             </p>
           </div>
-          <button onClick={onCancel} className="p-2 hover:bg-gray-100 rounded-xl transition-all cursor-pointer">
+          <button onClick={onCancel} className="p-2 hover:bg-gray-100 rounded-xl transition-all cursor-pointer shrink-0">
             <X className="w-4.5 h-4.5 text-gray-500" />
           </button>
         </div>
 
         {/* Crop area */}
-        <div className="p-4 bg-gray-900 flex items-center justify-center">
+        <div className="p-4 bg-gray-900 flex items-center justify-center overflow-auto">
           <div
             ref={containerRef}
             className="relative inline-block select-none touch-none"
@@ -190,7 +221,8 @@ export default function ImageCropper({ file, onCancel, onConfirm, queueLabel }: 
               src={imgUrl}
               alt="crop preview"
               onLoad={handleImageLoad}
-              className="max-h-[55vh] max-w-full block"
+              onError={() => setLoadError(true)}
+              className="max-h-[38vh] sm:max-h-[50vh] max-w-full block"
               draggable={false}
             />
 
@@ -235,11 +267,19 @@ export default function ImageCropper({ file, onCancel, onConfirm, queueLabel }: 
           </div>
         </div>
 
+        {loadError && (
+          <div className="mx-4 mb-2 p-3 bg-amber-50 border border-amber-100 text-amber-800 text-[11px] font-bold rounded-xl text-center">
+            تعذّر عرض هذه الصورة للاقتصاص (قد تكون بصيغة غير مدعومة من المتصفح). تقدر ترفعها كما هي بدون اقتصاص.
+          </div>
+        )}
+
         {/* Footer: size info + actions */}
-        <div className="p-4 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+        <div className="p-4 border-t border-gray-100 flex items-center justify-between gap-3 flex-wrap shrink-0 sticky bottom-0 bg-white">
           <div className="flex items-center gap-1.5 text-[11px] font-black text-gray-500 bg-gray-50 px-3 py-1.5 rounded-xl">
             <Maximize2 className="w-3.5 h-3.5" />
-            الحجم بعد الاقتصاص: {outputW} × {outputH} بكسل (~{estimatedKb > 1024 ? `${(estimatedKb / 1024).toFixed(1)} ميجا` : `${estimatedKb} كيلوبايت`} تقريباً)
+            {loadError
+              ? "تعذر حساب الحجم"
+              : `الحجم بعد الاقتصاص: ${outputW} × ${outputH} بكسل (~${estimatedKb > 1024 ? `${(estimatedKb / 1024).toFixed(1)} ميجا` : `${estimatedKb} كيلوبايت`} تقريباً)`}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -248,14 +288,24 @@ export default function ImageCropper({ file, onCancel, onConfirm, queueLabel }: 
             >
               إلغاء
             </button>
-            <button
-              onClick={handleConfirm}
-              disabled={processing}
-              className="flex items-center gap-1.5 px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer disabled:opacity-60"
-            >
-              <Check className="w-3.5 h-3.5" />
-              {processing ? "جاري المعالجة..." : "قص وإضافة الصورة"}
-            </button>
+            {loadError ? (
+              <button
+                onClick={() => onConfirm(file)}
+                className="flex items-center gap-1.5 px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                رفع الصورة كما هي (بدون اقتصاص)
+              </button>
+            ) : (
+              <button
+                onClick={handleConfirm}
+                disabled={processing || renderedSize.w === 0}
+                className="flex items-center gap-1.5 px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black shadow-md transition-all cursor-pointer disabled:opacity-60"
+              >
+                <Check className="w-3.5 h-3.5" />
+                {processing ? "جاري المعالجة..." : "قص وإضافة الصورة"}
+              </button>
+            )}
           </div>
         </div>
       </div>
