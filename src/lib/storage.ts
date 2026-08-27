@@ -83,7 +83,7 @@ export async function uploadMedia(
   folder: string,
   qualityLevel: ImageQualityLevel = "medium"
 ): Promise<string> {
-  const isImage = file.type.startsWith("image/");
+  const isImage = file.type.startsWith("image/") || (!file.type && hasImageExtension(file.name));
   const fileToUpload = isImage ? await compressImage(file, qualityLevel) : file;
 
   const path = `${folder}/${randomFileName(fileToUpload.name)}`;
@@ -111,9 +111,20 @@ export async function uploadImages(files: File[], folder: string, qualityLevel: 
   return Promise.all(files.map((file) => uploadMedia(file, folder, qualityLevel)));
 }
 
+const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "bmp", "avif"];
+
+function hasImageExtension(filename: string): boolean {
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
+  return IMAGE_EXTENSIONS.includes(ext);
+}
+
 /** يتأكد أن الملف صورة صحيحة الحجم قبل رفعها. */
 export function validateImageFile(file: File): string | null {
-  if (!file.type.startsWith("image/")) return "الرجاء اختيار ملف صورة صحيح.";
+  // بعض متصفحات الجوال (خصوصاً أندرويد عند الاختيار من تطبيقات معينة) لا تُرجع
+  // نوع الملف (file.type) بشكل صحيح ويكون فارغاً، رغم أن الملف صورة فعلية.
+  // لذلك نتحقق أيضاً من امتداد اسم الملف كخيار احتياطي قبل الرفض.
+  const looksLikeImage = file.type.startsWith("image/") || (!file.type && hasImageExtension(file.name));
+  if (!looksLikeImage) return "الرجاء اختيار ملف صورة صحيح.";
   if (file.size > MAX_IMAGE_SIZE) return "حجم الصورة كبير جداً. الحد الأقصى 5 ميجابايت لكل صورة (سيتم ضغطها تلقائياً بعد الرفع).";
   return null;
 }
