@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { X, Check, ArrowRight, ShieldCheck, Camera, Sparkles, Upload, Calendar, HelpCircle, Plus } from "lucide-react";
 import { PetListing, PetCategory, PetPurpose } from "../types";
 import { CITIES_YEMEN, GOVERNORATES_YEMEN, CITIES_BY_GOVERNORATE } from "../data";
@@ -79,8 +79,6 @@ export default function AddPetModal({
   const [lostTime, setLostTime] = useState(editingPet?.lostTime || "");
 
   const [formError, setFormError] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoUploadProgress, setVideoUploadProgress] = useState(false);
   const [imageUploadProgress, setImageUploadProgress] = useState(false);
   const [cropQueue, setCropQueue] = useState<File[]>([]);
@@ -88,32 +86,40 @@ export default function AddPetModal({
 
   // Handle local device file upload: يرفع الصور مباشرة إلى Supabase Storage
   // ويحفظ روابطها العامة (public URLs) بدل تخزينها كـ base64 ضخم داخل قاعدة البيانات.
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const validFiles: File[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const err = validateImageFile(file);
-      if (err) {
-        setFormError(err);
-        continue;
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const files = e.target.files;
+      if (!files || files.length === 0) {
+        e.target.value = "";
+        return;
       }
-      validFiles.push(file);
-    }
 
-    if (validFiles.length === 0) {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
+      const validFiles: File[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const err = validateImageFile(file);
+        if (err) {
+          setFormError(err);
+          continue;
+        }
+        validFiles.push(file);
+      }
 
-    setFormError("");
-    // بدل الرفع المباشر، نمرر الصور على أداة الاقتصاص أولاً واحدة تلو الأخرى
-    // ليتحكم المستخدم بحجم وإطار كل صورة قبل رفعها فعلياً
-    setCropQueueTotal(validFiles.length);
-    setCropQueue(validFiles);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+      if (validFiles.length === 0) {
+        e.target.value = "";
+        return;
+      }
+
+      setFormError("");
+      // بدل الرفع المباشر، نمرر الصور على أداة الاقتصاص أولاً واحدة تلو الأخرى
+      // ليتحكم المستخدم بحجم وإطار كل صورة قبل رفعها فعلياً
+      setCropQueueTotal(validFiles.length);
+      setCropQueue(validFiles);
+      e.target.value = "";
+    } catch (err: any) {
+      console.error("handleFileUpload error:", err);
+      setFormError("حدث خطأ غير متوقع أثناء اختيار الصورة. حاول مرة أخرى أو اختر صورة أخرى.");
+    }
   };
 
   // تُستدعى بعد ما المستخدم يأكد اقتصاص صورة واحدة من طابور الصور المحددة
@@ -147,7 +153,7 @@ export default function AddPetModal({
     const err = validateVideoFile(file);
     if (err) {
       setFormError(err);
-      if (videoInputRef.current) videoInputRef.current.value = "";
+      e.target.value = "";
       return;
     }
 
@@ -160,7 +166,7 @@ export default function AddPetModal({
       setFormError(err?.message || "تعذر رفع الفيديو. حاول مرة أخرى.");
     } finally {
       setVideoUploadProgress(false);
-      if (videoInputRef.current) videoInputRef.current.value = "";
+      e.target.value = "";
     }
   };
 
@@ -551,26 +557,23 @@ export default function AddPetModal({
                   )}
                   {/* Upload Trigger on overlay */}
                   <div className="absolute top-4 left-4 z-10">
-                    <button
-                      type="button"
-                      disabled={imageUploadProgress}
-                      onClick={() => fileInputRef.current?.click()}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    <label
+                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer ${
+                        imageUploadProgress ? "opacity-60 pointer-events-none" : ""
+                      }`}
                     >
                       <Upload className="w-3.5 h-3.5" />
-                      {imageUploadProgress ? "جاري رفع الصور..." : "إضافة صور من جهازك"}
-                    </button>
+                      {imageUploadProgress ? "جاري رفع الصور..." : "إضافة صورة من جهازك"}
+                      <input
+                        type="file"
+                        onChange={handleFileUpload}
+                        accept="image/*"
+                        className="sr-only"
+                      />
+                    </label>
                   </div>
                 </div>
 
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileUpload}
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                />
 
                 {/* Thumbnails grid & Presets panel */}
                 <div className="flex-1 flex flex-col justify-between space-y-4">
@@ -608,14 +611,13 @@ export default function AddPetModal({
                       ))}
                       
                       {/* Plus icon inside list */}
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-16 h-12 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-400 bg-gray-50 flex flex-col items-center justify-center text-gray-400 hover:text-brand-600 transition-all cursor-pointer"
-                        title="إضافة صور"
+                      <label
+                        className="relative w-16 h-12 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-400 bg-gray-50 flex flex-col items-center justify-center text-gray-400 hover:text-brand-600 transition-all cursor-pointer"
+                        title="إضافة صورة"
                       >
                         <Plus className="w-4 h-4" />
-                      </button>
+                        <input type="file" onChange={handleFileUpload} accept="image/*" className="sr-only" />
+                      </label>
                     </div>
                   </div>
               </div>
@@ -656,24 +658,16 @@ export default function AddPetModal({
                 <label className="block text-xs font-black text-gray-800">مقطع فيديو للأليف 🎥 (اختياري، يرجى رفعه من جهازك مباشرة):</label>
                 
                 <div className="flex flex-col gap-3 items-center">
-                  <button
-                    type="button"
-                    onClick={() => videoInputRef.current?.click()}
-                    className="w-full px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
-                    disabled={videoUploadProgress}
+                  <label
+                    className={`w-full px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
+                      videoUploadProgress ? "opacity-60 pointer-events-none" : ""
+                    }`}
                   >
                     <Upload className="w-4 h-4" />
                     {videoUploadProgress ? "جاري المعالجة..." : "اختر مقطع فيديو من جهازك 📱"}
-                  </button>
+                    <input type="file" onChange={handleVideoUpload} accept="video/*" className="sr-only" />
+                  </label>
                 </div>
-
-                <input
-                  type="file"
-                  ref={videoInputRef}
-                  onChange={handleVideoUpload}
-                  accept="video/*"
-                  className="hidden"
-                />
 
                 {videoUrl && (
                   <div className="mt-2.5 p-3 bg-white rounded-xl border border-gray-200 flex flex-col gap-2">
