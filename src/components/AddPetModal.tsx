@@ -89,13 +89,6 @@ export default function AddPetModal({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const files = e.target.files;
-      // 🔧 تشخيص مؤقت: يوريك بالضبط هل اختيار الصورة وصل للكود أصلاً ولا لا
-      alert(
-        `تشخيص: عدد الملفات=${files?.length ?? "لا يوجد"}` +
-          (files && files[0]
-            ? ` | الاسم=${files[0].name} | الحجم=${files[0].size} بايت | النوع="${files[0].type}"`
-            : "")
-      );
       if (!files || files.length === 0) {
         e.target.value = "";
         return;
@@ -562,22 +555,19 @@ export default function AddPetModal({
                       <span className="text-xs font-bold">لا تتوفر صور بعد</span>
                     </div>
                   )}
-                  {/* Upload Trigger on overlay */}
-                  <div className="absolute top-4 left-4 z-10">
-                    <label
-                      className={`flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer ${
-                        imageUploadProgress ? "opacity-60 pointer-events-none" : ""
-                      }`}
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      {imageUploadProgress ? "جاري رفع الصور..." : "إضافة صورة من جهازك"}
-                      <input
-                        type="file"
-                        onChange={handleFileUpload}
-                        accept="image/*"
-                        className="sr-only"
-                      />
-                    </label>
+                  {/* Upload Trigger — إدخال ملف ظاهر بالكامل (بدون أي إخفاء) لضمان عمله على كل الجوالات */}
+                  <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                    <Upload className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                    <span className="text-[10px] font-black text-gray-700 shrink-0">
+                      {imageUploadProgress ? "جاري الرفع..." : "إضافة صورة:"}
+                    </span>
+                    <input
+                      type="file"
+                      onChange={handleFileUpload}
+                      accept="image/*"
+                      disabled={imageUploadProgress}
+                      className="block w-[90px] text-[9px] text-gray-500 file:mr-1.5 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:bg-brand-600 file:text-white file:cursor-pointer disabled:opacity-50"
+                    />
                   </div>
                 </div>
 
@@ -616,15 +606,6 @@ export default function AddPetModal({
                           </button>
                         </div>
                       ))}
-                      
-                      {/* Plus icon inside list */}
-                      <label
-                        className="relative w-16 h-12 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-400 bg-gray-50 flex flex-col items-center justify-center text-gray-400 hover:text-brand-600 transition-all cursor-pointer"
-                        title="إضافة صورة"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <input type="file" onChange={handleFileUpload} accept="image/*" className="sr-only" />
-                      </label>
                     </div>
                   </div>
               </div>
@@ -664,16 +645,20 @@ export default function AddPetModal({
               <div className="space-y-2.5 p-4 bg-slate-50/70 rounded-2xl border border-slate-200">
                 <label className="block text-xs font-black text-gray-800">مقطع فيديو للأليف 🎥 (اختياري، يرجى رفعه من جهازك مباشرة):</label>
                 
-                <div className="flex flex-col gap-3 items-center">
-                  <label
-                    className={`w-full px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer ${
-                      videoUploadProgress ? "opacity-60 pointer-events-none" : ""
-                    }`}
-                  >
-                    <Upload className="w-4 h-4" />
-                    {videoUploadProgress ? "جاري المعالجة..." : "اختر مقطع فيديو من جهازك 📱"}
-                    <input type="file" onChange={handleVideoUpload} accept="video/*" className="sr-only" />
-                  </label>
+                <div className="flex flex-col gap-2 items-stretch bg-white rounded-xl border border-slate-200 p-3">
+                  <div className="flex items-center gap-2">
+                    <Upload className="w-4 h-4 text-brand-600 shrink-0" />
+                    <span className="text-xs font-black text-gray-700 shrink-0">
+                      {videoUploadProgress ? "جاري المعالجة..." : "اختر مقطع فيديو:"}
+                    </span>
+                    <input
+                      type="file"
+                      onChange={handleVideoUpload}
+                      accept="video/*"
+                      disabled={videoUploadProgress}
+                      className="block flex-1 min-w-0 text-[10px] text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-black file:bg-brand-600 file:text-white file:cursor-pointer disabled:opacity-50"
+                    />
+                  </div>
                 </div>
 
                 {videoUrl && (

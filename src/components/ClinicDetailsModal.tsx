@@ -26,8 +26,6 @@ export default function ClinicDetailsModal({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   // Active image index
   const images = clinic.images || [];
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -67,17 +65,20 @@ export default function ClinicDetailsModal({
   // Handle device image upload: يفتح أداة الاقتصاص أولاً، ثم يرفع الصورة المُقتصَّة
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      e.target.value = "";
+      return;
+    }
 
     setError("");
     const err = validateImageFile(file);
     if (err) {
       setError(err);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      e.target.value = "";
       return;
     }
     setCropFile(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    e.target.value = "";
   };
 
   const handleCropConfirm = async (croppedFile: File) => {
@@ -152,23 +153,18 @@ export default function ClinicDetailsModal({
                   )}
                 </div>
 
-                {/* Upload Button overlay on main image */}
-                <div className="absolute bottom-4 left-4">
-                  <button
-                    disabled={imageUploadProgress}
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600/90 hover:bg-brand-600 text-white text-xs font-black rounded-xl shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    {imageUploadProgress ? "جاري الرفع..." : "رفع صورة من جهازك"}
-                  </button>
+                {/* Upload Button overlay on main image — إدخال ملف ظاهر بالكامل لضمان عمله على الجوال */}
+                <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                  <Upload className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                  <span className="text-[10px] font-black text-gray-700 shrink-0">
+                    {imageUploadProgress ? "جاري الرفع..." : "رفع صورة:"}
+                  </span>
                   <input
                     type="file"
-                    ref={fileInputRef}
                     onChange={handleImageUpload}
                     accept="image/*"
-                    multiple
-                    className="hidden"
+                    disabled={imageUploadProgress}
+                    className="block w-[90px] text-[9px] text-gray-500 file:mr-1.5 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:bg-brand-600 file:text-white file:cursor-pointer disabled:opacity-50"
                   />
                 </div>
               </div>
@@ -187,15 +183,6 @@ export default function ClinicDetailsModal({
                       <img src={img} alt="clinic thumb" className="w-full h-full object-cover" />
                     </button>
                   ))}
-                  
-                  {/* Plus Thumb button */}
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-20 h-14 shrink-0 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-400 bg-gray-50 flex flex-col items-center justify-center text-gray-400 hover:text-brand-600 transition-all"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span className="text-[9px] font-bold mt-1">أضف صورة</span>
-                  </button>
                 </div>
               )}
             </div>
