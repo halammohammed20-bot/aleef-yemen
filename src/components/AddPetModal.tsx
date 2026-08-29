@@ -87,6 +87,8 @@ export default function AddPetModal({
   // Handle local device file upload: يرفع الصور مباشرة إلى Supabase Storage
   // ويحفظ روابطها العامة (public URLs) بدل تخزينها كـ base64 ضخم داخل قاعدة البيانات.
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 🔧 تشخيص نهائي: يطلع فوراً بمجرد ما الحدث يوصل، قبل أي تحقق أو شرط
+    alert(`[أ] onChange وصل! عدد الملفات: ${e.target.files?.length ?? "undefined"}`);
     try {
       const files = e.target.files;
       if (!files || files.length === 0) {
