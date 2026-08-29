@@ -25,6 +25,12 @@ const HANDLE_SIZE = 22;
  * ليتحكم بنفسه في حجم الصورة النهائية.
  */
 export default function ImageCropper({ file, onCancel, onConfirm, queueLabel }: ImageCropperProps) {
+  // 🔧 تشخيص مؤقت رقم 3: يؤكد هل أداة الاقتصاص فعلاً بدأت تُحمَّل (mount) في الصفحة
+  useEffect(() => {
+    alert(`تشخيص 3: أداة الاقتصاص بدأت التحميل الآن. اسم الملف: ${file.name}, الحجم: ${file.size} بايت`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [imgUrl, setImgUrl] = useState<string>("");
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
