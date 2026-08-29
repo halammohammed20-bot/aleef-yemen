@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { X, Check, ArrowRight, ShieldCheck, Camera, Sparkles, Upload, Calendar, HelpCircle, Plus } from "lucide-react";
 import { PetListing, PetCategory, PetPurpose } from "../types";
 import { CITIES_YEMEN, GOVERNORATES_YEMEN, CITIES_BY_GOVERNORATE } from "../data";
@@ -79,20 +79,22 @@ export default function AddPetModal({
   const [lostTime, setLostTime] = useState(editingPet?.lostTime || "");
 
   const [formError, setFormError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const [videoUploadProgress, setVideoUploadProgress] = useState(false);
   const [imageUploadProgress, setImageUploadProgress] = useState(false);
   const [cropQueue, setCropQueue] = useState<File[]>([]);
   const [cropQueueTotal, setCropQueueTotal] = useState(0);
 
-  const imageInputRef = useRef<HTMLInputElement>(null);
-
-  // معالجة الملفات المختارة — دالة عادية لا تعتمد على React SyntheticEvent إطلاقاً
-  const processSelectedImageFiles = (fileList: FileList | null) => {
-    if (!fileList || fileList.length === 0) return;
+  // Handle local device file upload: يرفع الصور مباشرة إلى Supabase Storage
+  // ويحفظ روابطها العامة (public URLs) بدل تخزينها كـ base64 ضخم داخل قاعدة البيانات.
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
     const validFiles: File[] = [];
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       const err = validateImageFile(file);
       if (err) {
         setFormError(err);
@@ -101,37 +103,18 @@ export default function AddPetModal({
       validFiles.push(file);
     }
 
-    if (validFiles.length === 0) return;
+    if (validFiles.length === 0) {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
 
     setFormError("");
     // بدل الرفع المباشر، نمرر الصور على أداة الاقتصاص أولاً واحدة تلو الأخرى
     // ليتحكم المستخدم بحجم وإطار كل صورة قبل رفعها فعلياً
     setCropQueueTotal(validFiles.length);
     setCropQueue(validFiles);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
-
-  // نربط الحدث مباشرة بعنصر DOM الحقيقي (addEventListener) بدل الاعتماد فقط على
-  // onChange في React — بعض متصفحات الجوال (خصوصاً عند اختيار صورة من المعرض
-  // وليس التصوير المباشر) لا تُطلق حدث change بشكل موثوق عبر نظام React
-  // الاصطناعي للأحداث. نستمع لكلا الحدثين change و input كإجراء احتياطي مضاعف.
-  useEffect(() => {
-    const input = imageInputRef.current;
-    if (!input) return;
-
-    const nativeHandler = (ev: Event) => {
-      const target = ev.target as HTMLInputElement;
-      processSelectedImageFiles(target.files);
-      target.value = "";
-    };
-
-    input.addEventListener("change", nativeHandler);
-    input.addEventListener("input", nativeHandler);
-    return () => {
-      input.removeEventListener("change", nativeHandler);
-      input.removeEventListener("input", nativeHandler);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // تُستدعى بعد ما المستخدم يأكد اقتصاص صورة واحدة من طابور الصور المحددة
   const handleCropConfirm = async (croppedFile: File) => {
@@ -156,15 +139,15 @@ export default function AddPetModal({
     setCropQueue((prev) => prev.slice(1));
   };
 
-  const videoInputRef = useRef<HTMLInputElement>(null);
-
   // Handle local device video upload: يرفع الفيديو إلى Supabase Storage ويحفظ رابطه العام.
-  const processSelectedVideoFile = async (file: File | null) => {
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     const err = validateVideoFile(file);
     if (err) {
       setFormError(err);
+      if (videoInputRef.current) videoInputRef.current.value = "";
       return;
     }
 
@@ -177,29 +160,9 @@ export default function AddPetModal({
       setFormError(err?.message || "تعذر رفع الفيديو. حاول مرة أخرى.");
     } finally {
       setVideoUploadProgress(false);
+      if (videoInputRef.current) videoInputRef.current.value = "";
     }
   };
-
-  // نفس أسلوب الاستماع المباشر للحدث الخام (native) المستخدم لحقل الصور، لضمان
-  // العمل الموثوق على كل متصفحات الجوال عند اختيار فيديو من المعرض
-  useEffect(() => {
-    const input = videoInputRef.current;
-    if (!input) return;
-
-    const nativeHandler = (ev: Event) => {
-      const target = ev.target as HTMLInputElement;
-      processSelectedVideoFile(target.files?.[0] || null);
-      target.value = "";
-    };
-
-    input.addEventListener("change", nativeHandler);
-    input.addEventListener("input", nativeHandler);
-    return () => {
-      input.removeEventListener("change", nativeHandler);
-      input.removeEventListener("input", nativeHandler);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const getModalTitle = () => {
     if (editingPet) return `تعديل بيانات الأليف (${editingPet.name})`;
@@ -586,22 +549,28 @@ export default function AddPetModal({
                       <span className="text-xs font-bold">لا تتوفر صور بعد</span>
                     </div>
                   )}
-                  {/* Upload Trigger — إدخال ملف ظاهر بالكامل (بدون أي إخفاء) لضمان عمله على كل الجوالات */}
-                  <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-sm rounded-xl shadow-lg px-2.5 py-1.5 flex items-center gap-1.5">
-                    <Upload className="w-3.5 h-3.5 text-brand-600 shrink-0" />
-                    <span className="text-[10px] font-black text-gray-700 shrink-0">
-                      {imageUploadProgress ? "جاري الرفع..." : "إضافة صورة:"}
-                    </span>
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      accept="image/*"
+                  {/* Upload Trigger on overlay */}
+                  <div className="absolute top-4 left-4 z-10">
+                    <button
+                      type="button"
                       disabled={imageUploadProgress}
-                      className="block w-[90px] text-[9px] text-gray-500 file:mr-1.5 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:bg-brand-600 file:text-white file:cursor-pointer disabled:opacity-50"
-                    />
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-black rounded-xl shadow-lg transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      {imageUploadProgress ? "جاري رفع الصور..." : "إضافة صور من جهازك"}
+                    </button>
                   </div>
                 </div>
 
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                />
 
                 {/* Thumbnails grid & Presets panel */}
                 <div className="flex-1 flex flex-col justify-between space-y-4">
@@ -637,6 +606,16 @@ export default function AddPetModal({
                           </button>
                         </div>
                       ))}
+                      
+                      {/* Plus icon inside list */}
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-16 h-12 rounded-lg border-2 border-dashed border-gray-300 hover:border-brand-400 bg-gray-50 flex flex-col items-center justify-center text-gray-400 hover:text-brand-600 transition-all cursor-pointer"
+                        title="إضافة صور"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
               </div>
@@ -676,21 +655,25 @@ export default function AddPetModal({
               <div className="space-y-2.5 p-4 bg-slate-50/70 rounded-2xl border border-slate-200">
                 <label className="block text-xs font-black text-gray-800">مقطع فيديو للأليف 🎥 (اختياري، يرجى رفعه من جهازك مباشرة):</label>
                 
-                <div className="flex flex-col gap-2 items-stretch bg-white rounded-xl border border-slate-200 p-3">
-                  <div className="flex items-center gap-2">
-                    <Upload className="w-4 h-4 text-brand-600 shrink-0" />
-                    <span className="text-xs font-black text-gray-700 shrink-0">
-                      {videoUploadProgress ? "جاري المعالجة..." : "اختر مقطع فيديو:"}
-                    </span>
-                    <input
-                      ref={videoInputRef}
-                      type="file"
-                      accept="video/*"
-                      disabled={videoUploadProgress}
-                      className="block flex-1 min-w-0 text-[10px] text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-black file:bg-brand-600 file:text-white file:cursor-pointer disabled:opacity-50"
-                    />
-                  </div>
+                <div className="flex flex-col gap-3 items-center">
+                  <button
+                    type="button"
+                    onClick={() => videoInputRef.current?.click()}
+                    className="w-full px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                    disabled={videoUploadProgress}
+                  >
+                    <Upload className="w-4 h-4" />
+                    {videoUploadProgress ? "جاري المعالجة..." : "اختر مقطع فيديو من جهازك 📱"}
+                  </button>
                 </div>
+
+                <input
+                  type="file"
+                  ref={videoInputRef}
+                  onChange={handleVideoUpload}
+                  accept="video/*"
+                  className="hidden"
+                />
 
                 {videoUrl && (
                   <div className="mt-2.5 p-3 bg-white rounded-xl border border-gray-200 flex flex-col gap-2">

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { Phone, MapPin, Star, ShieldAlert, Check, Clock, MessageSquare, Upload, Plus, Sparkles, Image as ImageIcon, ChevronDown, ChevronUp } from "lucide-react";
 import { Clinic, ClinicComment } from "../types";
 import { uploadMedia, validateImageFile } from "../lib/storage";
@@ -26,6 +26,8 @@ export default function ClinicCard({
   const [commentText, setCommentText] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Active image index
   const images = clinic.images || [];
@@ -62,39 +64,22 @@ export default function ClinicCard({
 
   const [imageUploadProgress, setImageUploadProgress] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Handle device image upload: يفتح أداة الاقتصاص أولاً، ثم يرفع الصورة المُقتصَّة
-  const processSelectedFile = (file: File | null) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
     setError("");
     const err = validateImageFile(file);
     if (err) {
       setError(err);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
     setCropFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
-
-  // نربط الحدث مباشرة بعنصر DOM الحقيقي بدل onChange في React، لأن بعض
-  // متصفحات الجوال لا تُطلق حدث change بشكل موثوق عند اختيار صورة من المعرض
-  useEffect(() => {
-    const input = imageInputRef.current;
-    if (!input) return;
-    const nativeHandler = (ev: Event) => {
-      const target = ev.target as HTMLInputElement;
-      processSelectedFile(target.files?.[0] || null);
-      target.value = "";
-    };
-    input.addEventListener("change", nativeHandler);
-    input.addEventListener("input", nativeHandler);
-    return () => {
-      input.removeEventListener("change", nativeHandler);
-      input.removeEventListener("input", nativeHandler);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleCropConfirm = async (croppedFile: File) => {
     setCropFile(null);
@@ -170,6 +155,19 @@ export default function ClinicCard({
                   <img src={img} alt="thumb" className="w-full h-full object-cover" />
                 </button>
               ))}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-12 h-9 shrink-0 rounded-lg border border-dashed border-gray-300 hover:border-brand-400 bg-gray-50 flex items-center justify-center text-gray-400 hover:text-brand-600 transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageUpload}
+                accept="image/*"
+                className="hidden"
+              />
             </div>
           )}
         </div>
@@ -280,20 +278,15 @@ export default function ClinicCard({
                 <h4 className="text-xs font-black text-gray-900">آراء ومراجعات المربين ({clinic.comments?.length || 0})</h4>
               </div>
 
-              {/* Upload image action button inside card — إدخال ملف ظاهر بالكامل لضمان عمله على الجوال */}
-              <div className="flex items-center gap-1 bg-brand-50 rounded-lg px-1.5 py-1">
-                <Upload className="w-3.5 h-3.5 text-brand-700 shrink-0" />
-                <span className="text-[10px] font-black text-brand-700 shrink-0">
-                  {imageUploadProgress ? "جاري الرفع..." : "رفع صورة:"}
-                </span>
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  disabled={imageUploadProgress}
-                  className="block w-[76px] text-[8px] text-transparent file:mr-1 file:py-1 file:px-1.5 file:rounded file:border-0 file:text-[9px] file:font-black file:bg-brand-600 file:text-white file:cursor-pointer disabled:opacity-50"
-                />
-              </div>
+              {/* Upload image action button inside card */}
+              <button
+                disabled={imageUploadProgress}
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 text-[10px] font-black rounded-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                {imageUploadProgress ? "جاري الرفع..." : "رفع صورة للعيادة"}
+              </button>
             </div>
 
             {success && (
