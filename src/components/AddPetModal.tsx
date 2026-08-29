@@ -89,6 +89,13 @@ export default function AddPetModal({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const files = e.target.files;
+      // 🔧 تشخيص مؤقت: يوريك بالضبط هل اختيار الصورة وصل للكود أصلاً ولا لا
+      alert(
+        `تشخيص: عدد الملفات=${files?.length ?? "لا يوجد"}` +
+          (files && files[0]
+            ? ` | الاسم=${files[0].name} | الحجم=${files[0].size} بايت | النوع="${files[0].type}"`
+            : "")
+      );
       if (!files || files.length === 0) {
         e.target.value = "";
         return;
