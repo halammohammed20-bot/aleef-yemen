@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, Check, ArrowRight, ShieldCheck, Camera, Sparkles, Upload, Calendar, HelpCircle, Plus } from "lucide-react";
 import { PetListing, PetCategory, PetPurpose } from "../types";
 import { CITIES_YEMEN, GOVERNORATES_YEMEN, CITIES_BY_GOVERNORATE } from "../data";
@@ -84,47 +84,54 @@ export default function AddPetModal({
   const [cropQueue, setCropQueue] = useState<File[]>([]);
   const [cropQueueTotal, setCropQueueTotal] = useState(0);
 
-  // Handle local device file upload: يرفع الصور مباشرة إلى Supabase Storage
-  // ويحفظ روابطها العامة (public URLs) بدل تخزينها كـ base64 ضخم داخل قاعدة البيانات.
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // 🔧 تشخيص نهائي: يطلع فوراً بمجرد ما الحدث يوصل، قبل أي تحقق أو شرط
-    alert(`[أ] onChange وصل! عدد الملفات: ${e.target.files?.length ?? "undefined"}`);
-    try {
-      const files = e.target.files;
-      if (!files || files.length === 0) {
-        e.target.value = "";
-        return;
-      }
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
-      const validFiles: File[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const err = validateImageFile(file);
-        if (err) {
-          setFormError(err);
-          continue;
-        }
-        validFiles.push(file);
-      }
+  // معالجة الملفات المختارة — دالة عادية لا تعتمد على React SyntheticEvent إطلاقاً
+  const processSelectedImageFiles = (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
 
-      if (validFiles.length === 0) {
-        e.target.value = "";
-        return;
+    const validFiles: File[] = [];
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const err = validateImageFile(file);
+      if (err) {
+        setFormError(err);
+        continue;
       }
-
-      setFormError("");
-      // 🔧 تشخيص مؤقت رقم 2: يؤكد هل الملف انقبل ودخل طابور الاقتصاص فعلاً
-      alert(`تشخيص 2: الملف انقبل بنجاح (${validFiles[0].name})، جاري فتح نافذة الاقتصاص الآن...`);
-      // بدل الرفع المباشر، نمرر الصور على أداة الاقتصاص أولاً واحدة تلو الأخرى
-      // ليتحكم المستخدم بحجم وإطار كل صورة قبل رفعها فعلياً
-      setCropQueueTotal(validFiles.length);
-      setCropQueue(validFiles);
-      e.target.value = "";
-    } catch (err: any) {
-      console.error("handleFileUpload error:", err);
-      setFormError("حدث خطأ غير متوقع أثناء اختيار الصورة. حاول مرة أخرى أو اختر صورة أخرى.");
+      validFiles.push(file);
     }
+
+    if (validFiles.length === 0) return;
+
+    setFormError("");
+    // بدل الرفع المباشر، نمرر الصور على أداة الاقتصاص أولاً واحدة تلو الأخرى
+    // ليتحكم المستخدم بحجم وإطار كل صورة قبل رفعها فعلياً
+    setCropQueueTotal(validFiles.length);
+    setCropQueue(validFiles);
   };
+
+  // نربط الحدث مباشرة بعنصر DOM الحقيقي (addEventListener) بدل الاعتماد فقط على
+  // onChange في React — بعض متصفحات الجوال (خصوصاً عند اختيار صورة من المعرض
+  // وليس التصوير المباشر) لا تُطلق حدث change بشكل موثوق عبر نظام React
+  // الاصطناعي للأحداث. نستمع لكلا الحدثين change و input كإجراء احتياطي مضاعف.
+  useEffect(() => {
+    const input = imageInputRef.current;
+    if (!input) return;
+
+    const nativeHandler = (ev: Event) => {
+      const target = ev.target as HTMLInputElement;
+      processSelectedImageFiles(target.files);
+      target.value = "";
+    };
+
+    input.addEventListener("change", nativeHandler);
+    input.addEventListener("input", nativeHandler);
+    return () => {
+      input.removeEventListener("change", nativeHandler);
+      input.removeEventListener("input", nativeHandler);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // تُستدعى بعد ما المستخدم يأكد اقتصاص صورة واحدة من طابور الصور المحددة
   const handleCropConfirm = async (croppedFile: File) => {
@@ -149,15 +156,15 @@ export default function AddPetModal({
     setCropQueue((prev) => prev.slice(1));
   };
 
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
   // Handle local device video upload: يرفع الفيديو إلى Supabase Storage ويحفظ رابطه العام.
-  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const processSelectedVideoFile = async (file: File | null) => {
     if (!file) return;
 
     const err = validateVideoFile(file);
     if (err) {
       setFormError(err);
-      e.target.value = "";
       return;
     }
 
@@ -170,9 +177,29 @@ export default function AddPetModal({
       setFormError(err?.message || "تعذر رفع الفيديو. حاول مرة أخرى.");
     } finally {
       setVideoUploadProgress(false);
-      e.target.value = "";
     }
   };
+
+  // نفس أسلوب الاستماع المباشر للحدث الخام (native) المستخدم لحقل الصور، لضمان
+  // العمل الموثوق على كل متصفحات الجوال عند اختيار فيديو من المعرض
+  useEffect(() => {
+    const input = videoInputRef.current;
+    if (!input) return;
+
+    const nativeHandler = (ev: Event) => {
+      const target = ev.target as HTMLInputElement;
+      processSelectedVideoFile(target.files?.[0] || null);
+      target.value = "";
+    };
+
+    input.addEventListener("change", nativeHandler);
+    input.addEventListener("input", nativeHandler);
+    return () => {
+      input.removeEventListener("change", nativeHandler);
+      input.removeEventListener("input", nativeHandler);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getModalTitle = () => {
     if (editingPet) return `تعديل بيانات الأليف (${editingPet.name})`;
@@ -566,8 +593,8 @@ export default function AddPetModal({
                       {imageUploadProgress ? "جاري الرفع..." : "إضافة صورة:"}
                     </span>
                     <input
+                      ref={imageInputRef}
                       type="file"
-                      onChange={handleFileUpload}
                       accept="image/*"
                       disabled={imageUploadProgress}
                       className="block w-[90px] text-[9px] text-gray-500 file:mr-1.5 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:bg-brand-600 file:text-white file:cursor-pointer disabled:opacity-50"
@@ -656,8 +683,8 @@ export default function AddPetModal({
                       {videoUploadProgress ? "جاري المعالجة..." : "اختر مقطع فيديو:"}
                     </span>
                     <input
+                      ref={videoInputRef}
                       type="file"
-                      onChange={handleVideoUpload}
                       accept="video/*"
                       disabled={videoUploadProgress}
                       className="block flex-1 min-w-0 text-[10px] text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-black file:bg-brand-600 file:text-white file:cursor-pointer disabled:opacity-50"

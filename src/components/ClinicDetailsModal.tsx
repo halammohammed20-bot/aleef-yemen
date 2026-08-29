@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { X, MapPin, Phone, Star, ShieldAlert, Check, Clock, MessageSquare, Upload, Plus, Sparkles, Image as ImageIcon } from "lucide-react";
 import { Clinic, ClinicComment } from "../types";
 import { uploadMedia, validateImageFile } from "../lib/storage";
@@ -61,25 +61,39 @@ export default function ClinicDetailsModal({
 
   const [imageUploadProgress, setImageUploadProgress] = useState(false);
   const [cropFile, setCropFile] = useState<File | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   // Handle device image upload: يفتح أداة الاقتصاص أولاً، ثم يرفع الصورة المُقتصَّة
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) {
-      e.target.value = "";
-      return;
-    }
+  const processSelectedFile = (file: File | null) => {
+    if (!file) return;
 
     setError("");
     const err = validateImageFile(file);
     if (err) {
       setError(err);
-      e.target.value = "";
       return;
     }
     setCropFile(file);
-    e.target.value = "";
   };
+
+  // نربط الحدث مباشرة بعنصر DOM الحقيقي بدل onChange في React، لأن بعض
+  // متصفحات الجوال لا تُطلق حدث change بشكل موثوق عند اختيار صورة من المعرض
+  useEffect(() => {
+    const input = imageInputRef.current;
+    if (!input) return;
+    const nativeHandler = (ev: Event) => {
+      const target = ev.target as HTMLInputElement;
+      processSelectedFile(target.files?.[0] || null);
+      target.value = "";
+    };
+    input.addEventListener("change", nativeHandler);
+    input.addEventListener("input", nativeHandler);
+    return () => {
+      input.removeEventListener("change", nativeHandler);
+      input.removeEventListener("input", nativeHandler);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCropConfirm = async (croppedFile: File) => {
     setCropFile(null);
@@ -160,8 +174,8 @@ export default function ClinicDetailsModal({
                     {imageUploadProgress ? "جاري الرفع..." : "رفع صورة:"}
                   </span>
                   <input
+                    ref={imageInputRef}
                     type="file"
-                    onChange={handleImageUpload}
                     accept="image/*"
                     disabled={imageUploadProgress}
                     className="block w-[90px] text-[9px] text-gray-500 file:mr-1.5 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:bg-brand-600 file:text-white file:cursor-pointer disabled:opacity-50"
